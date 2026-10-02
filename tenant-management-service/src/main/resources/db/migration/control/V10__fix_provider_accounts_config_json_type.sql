@@ -1,0 +1,1 @@
+ALTER TABLE provider_accounts ALTER COLUMN config_json TYPE TEXT USING config_json::TEXT;

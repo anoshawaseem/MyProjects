@@ -1,0 +1,31 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: tenant-management-service
+  datasource:
+    url: jdbc:postgresql://localhost:5432/micomm_control
+    username: postgres
+    password: root
+  jpa:
+    hibernate:
+      ddl-auto: none
+    open-in-view: false
+  flyway:
+    locations: classpath:db/migration/control
+    baseline-on-migrate: true
+
+micomm:
+  jwt:
+    secret: "dGhpc2lzYXRlc3RzZWNyZXRrZXlmb3Jqd3RzaWduaW5nMzJieXRlcw=="
+    access-token-expiry-minutes: 120
+    refresh-token-expiry-days: 7
+
+  provisioning:
+    host: localhost
+    port: 5432
+    shared-database-name: micomm_platform
+    admin-username: postgres
+    admin-password: root
+    tenant-migration-location: classpath:db/migration/tenant
