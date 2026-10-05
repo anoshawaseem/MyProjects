@@ -29,3 +29,6 @@ micomm:
     admin-username: postgres
     admin-password: root
     tenant-migration-location: classpath:db/migration/tenant
+
+  internal:
+    api-key: ${INTERNAL_API_KEY:change-me-in-prod}

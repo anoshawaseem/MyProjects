@@ -1,0 +1,45 @@
+server:
+  port: 8082
+
+spring:
+  application:
+    name: email-service
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+    consumer:
+      group-id: email-service
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "com.micomm.email.kafka"
+        spring.json.use.type.headers: false
+        spring.json.value.default.type: com.micomm.email.kafka.EmailSendMessage
+
+micomm:
+  jwt:
+    secret: "dGhpc2lzYXRlc3RzZWNyZXRrZXlmb3Jqd3RzaWduaW5nMzJieXRlcw=="
+    access-token-expiry-minutes: 120
+    refresh-token-expiry-days: 7
+
+  internal:
+    api-key: ${INTERNAL_API_KEY:change-me-in-prod}
+    tenant-management-base-url: ${TENANT_MGMT_BASE_URL:http://localhost:8081}
+
+  provisioning:
+    host: localhost
+    port: 5432
+    shared-database-name: micomm_platform
+    admin-username: postgres
+    admin-password: root
+
+kafka:
+  topics:
+    email-send: email.send.v1
+    email-result: email.result.v1
+
+logging:
+  level:
+    com.micomm.email: INFO

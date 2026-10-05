@@ -22,6 +22,7 @@
     <modules>
         <module>common-lib</module>
         <module>tenant-management-service</module>
+        <module>email-service</module>
     </modules>
 
     <dependencyManagement>

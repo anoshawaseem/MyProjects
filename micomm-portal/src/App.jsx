@@ -6,6 +6,7 @@ import DashboardPage from "./pages/DashboardPage";
 import ProductsPage from "./pages/ProductsPage";
 import ClubProductsPage from "./pages/ClubProductsPage";
 import ClubProductProvidersPage from "./pages/ClubProductProvidersPage";
+import SendTestEmailPage from "./pages/SendTestEmailPage";
 
 export default function App() {
     return (
@@ -42,6 +43,14 @@ export default function App() {
                         element={
                             <ProtectedRoute>
                                 <ClubProductProvidersPage />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/clubs/:clubId/products/:productId/test-email"
+                        element={
+                            <ProtectedRoute>
+                                <SendTestEmailPage />
                             </ProtectedRoute>
                         }
                     />

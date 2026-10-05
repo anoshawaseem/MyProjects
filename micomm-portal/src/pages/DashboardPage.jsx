@@ -85,9 +85,12 @@ export default function DashboardPage() {
             contactEmail,
             contactPhone,
         });
+    }
 
+    async function performCreateClub() {
         setCreating(true);
         setTenantDatabase(null);
+        setError(null);
 
         try {
             const created = await clubService.createOrganization({
@@ -102,9 +105,10 @@ export default function DashboardPage() {
             setClub(created);
             await refreshClubList();
         } catch (err) {
-            setError(err instanceof Error ? err.message : "Failed to create club");
+            setError(err.response?.data?.errorMessage ?? err.message ?? "Failed to create club");
         } finally {
             setCreating(false);
+            setConfirmAction(null);
         }
     }
 
@@ -225,9 +229,10 @@ export default function DashboardPage() {
 
     function handleConfirmDialogConfirm() {
         if (confirmAction?.type === "create") {
-            handleCreateClub();
+            performCreateClub();
         } else {
             handleTriggerOnboarding();
+            setConfirmAction(null);
         }
     }
 

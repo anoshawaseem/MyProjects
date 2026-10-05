@@ -16,6 +16,10 @@ public class ClubService {
     }
 
     public Club create(ClubCreateRequest request) {
+        if (clubRepository.existsBySlug(request.getSlug())) {
+            throw new SlugAlreadyExistsException(request.getSlug());
+        }
+
         Club club = new Club();
         club.setName(request.getName());
         club.setSlug(request.getSlug());

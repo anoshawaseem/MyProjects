@@ -9,7 +9,7 @@ import {
     getClubProductProviders,
     assignClubProductProvider,
 } from "../api/providerService";
-import { ArrowLeft, Plug, Plus, Loader2, CheckCircle2, AlertTriangle, Mail, MessageSquare } from "lucide-react";
+import { ArrowLeft, Plug, Plus, Loader2, CheckCircle2, AlertTriangle, Mail, MessageSquare, Send } from "lucide-react";
 
 const EMPTY_CONFIG = {
     SENDGRID: { apiKey: "", fromEmail: "" },
@@ -389,6 +389,15 @@ export default function ClubProductProvidersPage() {
                                         options={accountsForChannel("SMS")}
                                         onChange={(id) => handleAssign("SMS", id)}
                                     />
+                                    {assignments.EMAIL && (
+                                        <Link
+                                            to={`/clubs/${clubId}/products/${selectedProductId}/test-email`}
+                                            className="btn-primary self-start"
+                                        >
+                                            <Send className="w-4 h-4" />
+                                            Test Send Email
+                                        </Link>
+                                    )}
                                 </div>
                             )}
                         </section>
