@@ -1,7 +1,7 @@
 package com.micomm.email.usage;
 
-import java.sql.Timestamp;
-import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -11,6 +11,11 @@ import org.springframework.stereotype.Component;
  * Writes email send results into the dynamically-resolved tenant schema.
  * Schema name is validated upstream (comes from tenant-management-service,
  * which already validates it against ^[a-z][a-z0-9_]{1,62}$ on creation).
+ *
+ * Matches the actual tenant table layout created by
+ * TenantSchemaDefinition.createTableStatements() in tenant-management-service:
+ *   email_logs(id, recipient, subject, status, sent_at, created_at)
+ *   usage_counters(id, metric_name, metric_value, period_start, period_end, created_at)
  */
 @Component
 public class EmailMessageWriter {
@@ -21,101 +26,64 @@ public class EmailMessageWriter {
         this.jdbcTemplate = platformJdbcTemplate;
     }
 
-    public UUID insertEmailMessage(String schemaName, UUID productId, UUID providerAccountId,
-                                     String fromEmail, String subject, String htmlBody,
-                                     int recipientCount, String idempotencyKey) {
+    public UUID insertEmailLog(String schemaName, String recipientEmail, String subject, String status) {
         setSearchPath(schemaName);
 
-        UUID messageId = UUID.randomUUID();
+        UUID logId = UUID.randomUUID();
         jdbcTemplate.update(
-                "INSERT INTO email.email_messages " +
-                "(id, product_id, provider_account_id, from_email, subject, html_body, status, recipient_count, idempotency_key, created_at, queued_at) " +
-                "VALUES (?, ?, ?, ?, ?, ?, 'QUEUED', ?, ?, now(), now())",
-                messageId, productId, providerAccountId, fromEmail, subject, htmlBody, recipientCount, idempotencyKey
+                "INSERT INTO email_logs (id, recipient, subject, status, sent_at, created_at) " +
+                "VALUES (?, ?, ?, ?, ?, now())",
+                logId, recipientEmail, subject, status,
+                "SENT".equals(status) ? java.sql.Timestamp.from(java.time.Instant.now()) : null
         );
-        return messageId;
+        return logId;
     }
 
-    public UUID insertRecipient(String schemaName, UUID emailMessageId, String emailAddress) {
-        setSearchPath(schemaName);
-
-        UUID recipientId = UUID.randomUUID();
-        jdbcTemplate.update(
-                "INSERT INTO email.email_recipients (id, email_message_id, email_address, recipient_type, status, created_at) " +
-                "VALUES (?, ?, ?, 'TO', 'PENDING', now())",
-                recipientId, emailMessageId, emailAddress
-        );
-        return recipientId;
-    }
-
-    public void markRecipientSent(String schemaName, UUID recipientId, String providerMessageId) {
+    public void updateEmailLogStatus(String schemaName, UUID logId, String status) {
         setSearchPath(schemaName);
         jdbcTemplate.update(
-                "UPDATE email.email_recipients SET status = 'SENT', provider_message_id = ?, sent_at = now() WHERE id = ?",
-                providerMessageId, recipientId
-        );
-    }
-
-    public void markRecipientFailed(String schemaName, UUID recipientId, String errorCode, String errorMessage) {
-        setSearchPath(schemaName);
-        jdbcTemplate.update(
-                "UPDATE email.email_recipients SET status = 'FAILED', error_code = ?, error_message = ?, failed_at = now() WHERE id = ?",
-                errorCode, errorMessage, recipientId
-        );
-    }
-
-    public void insertDeliveryAttempt(String schemaName, UUID recipientId, int attemptNumber,
-                                        UUID providerAccountId, String status,
-                                        String responseCode, String providerMessageId,
-                                        String errorCode, String errorMessage) {
-        setSearchPath(schemaName);
-        jdbcTemplate.update(
-                "INSERT INTO email.email_delivery_attempts " +
-                "(email_recipient_id, attempt_number, provider_account_id, status, provider_response_code, provider_message_id, error_code, error_message, attempted_at) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, now())",
-                recipientId, attemptNumber, providerAccountId, status, responseCode, providerMessageId, errorCode, errorMessage
-        );
-    }
-
-    public void markMessageCompleted(String schemaName, UUID emailMessageId, String finalStatus) {
-        setSearchPath(schemaName);
-        jdbcTemplate.update(
-                "UPDATE email.email_messages SET status = ?, completed_at = now(), " +
-                "sent_at = CASE WHEN sent_at IS NULL THEN now() ELSE sent_at END WHERE id = ?",
-                finalStatus, emailMessageId
+                "UPDATE email_logs SET status = ?, sent_at = CASE WHEN ? = 'SENT' THEN now() ELSE sent_at END WHERE id = ?",
+                status, status, logId
         );
     }
 
     /**
-     * Upserts the usage row for (product, EMAIL, provider, current month),
-     * incrementing counters atomically to avoid race conditions under
-     * concurrent bulk sends.
+     * Increments usage_counters for the current day's period (or you could
+     * use month-based bucketing - adjust as needed). Since there's no unique
+     * constraint on (metric_name, period_start, period_end), this does a
+     * find-or-insert-then-update to avoid duplicate rows from concurrent sends.
      */
-    public void incrementUsage(String schemaName, UUID productId, UUID providerAccountId,
-                                 int messageDelta, int recipientDelta, int successDelta, int failureDelta) {
+    public synchronized void incrementUsageCounter(String schemaName, String metricName, long delta) {
         setSearchPath(schemaName);
 
-        LocalDate usagePeriod = LocalDate.now().withDayOfMonth(1);
+        OffsetDateTime now = OffsetDateTime.now();
+        OffsetDateTime periodStart = now.truncatedTo(ChronoUnit.DAYS);
+        OffsetDateTime periodEnd = periodStart.plusDays(1);
 
-        jdbcTemplate.update(
-                "INSERT INTO usage.notification_usage " +
-                "(product_id, channel, provider_account_id, usage_period, message_count, recipient_count, success_count, failure_count, updated_at) " +
-                "VALUES (?, 'EMAIL', ?, ?, ?, ?, ?, ?, now()) " +
-                "ON CONFLICT (product_id, channel, provider_account_id, usage_period) " +
-                "DO UPDATE SET " +
-                "  message_count = usage.notification_usage.message_count + EXCLUDED.message_count, " +
-                "  recipient_count = usage.notification_usage.recipient_count + EXCLUDED.recipient_count, " +
-                "  success_count = usage.notification_usage.success_count + EXCLUDED.success_count, " +
-                "  failure_count = usage.notification_usage.failure_count + EXCLUDED.failure_count, " +
-                "  updated_at = now()",
-                productId, providerAccountId, Timestamp.valueOf(usagePeriod.atStartOfDay()),
-                messageDelta, recipientDelta, successDelta, failureDelta
+        Long existingId = jdbcTemplate.query(
+                "SELECT id FROM usage_counters WHERE metric_name = ? AND period_start = ? AND period_end = ? LIMIT 1",
+                rs -> rs.next() ? rs.getLong(1) : null,
+                metricName, java.sql.Timestamp.from(periodStart.toInstant()), java.sql.Timestamp.from(periodEnd.toInstant())
         );
+
+        int updated = jdbcTemplate.update(
+                "UPDATE usage_counters SET metric_value = metric_value + ? " +
+                "WHERE metric_name = ? AND period_start = ? AND period_end = ?",
+                delta, metricName,
+                java.sql.Timestamp.from(periodStart.toInstant()), java.sql.Timestamp.from(periodEnd.toInstant())
+        );
+
+        if (updated == 0) {
+            jdbcTemplate.update(
+                    "INSERT INTO usage_counters (id, metric_name, metric_value, period_start, period_end, created_at) " +
+                    "VALUES (?, ?, ?, ?, ?, now())",
+                    UUID.randomUUID(), metricName, delta,
+                    java.sql.Timestamp.from(periodStart.toInstant()), java.sql.Timestamp.from(periodEnd.toInstant())
+            );
+        }
     }
 
     private void setSearchPath(String schemaName) {
-        // schemaName already validated at provisioning time (matches ^[a-z][a-z0-9_]{1,62}$),
-        // but defensively re-check here before interpolating into SQL.
         if (!schemaName.matches("^[a-z][a-z0-9_]{1,62}$")) {
             throw new IllegalArgumentException("Invalid schema name: " + schemaName);
         }

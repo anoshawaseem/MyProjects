@@ -1,5 +1,16 @@
 package com.micomm.email.send;
 
+import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.List;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.stereotype.Component;
+
 import com.micomm.email.client.TenantManagementClient;
 import com.micomm.email.client.dto.ResolvedProviderDto;
 import com.micomm.email.client.dto.TenantDatabaseDto;
@@ -10,17 +21,6 @@ import com.micomm.email.provider.EmailProviderFactory;
 import com.micomm.email.provider.EmailSendRequest;
 import com.micomm.email.provider.EmailSendResult;
 import com.micomm.email.usage.EmailMessageWriter;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.kafka.annotation.KafkaListener;
-import org.springframework.kafka.core.KafkaTemplate;
-import org.springframework.stereotype.Component;
-
-import java.time.OffsetDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
 
 @Component
 public class EmailSendWorker {
@@ -50,7 +50,7 @@ public class EmailSendWorker {
             topics = "${kafka.topics.email-send}",
             containerFactory = "emailSendKafkaListenerContainerFactory")
     public void handle(EmailSendMessage message) {
-        log.info("Processing email send request [{}] for club [{}] / product [{}], {} recipients",
+        log.info("Processing email send request [{}] for club [{}] / product [{}],{} recipients",
                 message.requestId(), message.clubId(), message.productId(), message.recipients().size());
 
         try {
@@ -62,24 +62,11 @@ public class EmailSendWorker {
             String schemaName = tenantDb.schemaName();
             EmailProvider emailProvider = providerFactory.get(provider.providerTypeCode());
 
-            UUID emailMessageId = writer.insertEmailMessage(
-                    schemaName,
-                    message.productId(),
-                    provider.providerAccountId(),
-                    message.fromEmail(),
-                    message.subject(),
-                    message.htmlBody(),
-                    message.recipients().size(),
-                    message.idempotencyKey()
-            );
-
             int successCount = 0;
             int failureCount = 0;
             List<EmailResultMessage.FailureDetail> failures = new ArrayList<>();
 
             for (String recipientEmail : message.recipients()) {
-                UUID recipientId = writer.insertRecipient(schemaName, emailMessageId, recipientEmail);
-
                 EmailSendResult result = emailProvider.send(new EmailSendRequest(
                         message.fromEmail(),
                         recipientEmail,
@@ -89,25 +76,20 @@ public class EmailSendWorker {
                         provider.configJson()
                 ));
 
+                String status = result.success() ? "SENT" : "FAILED";
+                writer.insertEmailLog(schemaName, recipientEmail, message.subject(), status);
+
                 if (result.success()) {
-                    writer.markRecipientSent(schemaName, recipientId, result.providerMessageId());
-                    writer.insertDeliveryAttempt(schemaName, recipientId, 1, provider.providerAccountId(),
-                            "SENT", result.responseCode(), result.providerMessageId(), null, null);
                     successCount++;
                 } else {
-                    writer.markRecipientFailed(schemaName, recipientId, result.errorCode(), result.errorMessage());
-                    writer.insertDeliveryAttempt(schemaName, recipientId, 1, provider.providerAccountId(),
-                            "FAILED", null, null, result.errorCode(), result.errorMessage());
                     failureCount++;
                     failures.add(new EmailResultMessage.FailureDetail(recipientEmail, result.errorMessage()));
                 }
             }
 
-            String finalStatus = failureCount == 0 ? "SENT" : (successCount == 0 ? "FAILED" : "SENT");
-            writer.markMessageCompleted(schemaName, emailMessageId, finalStatus);
-
-            writer.incrementUsage(schemaName, message.productId(), provider.providerAccountId(),
-                    1, message.recipients().size(), successCount, failureCount);
+            writer.incrementUsageCounter(schemaName, "EMAIL_MESSAGES_SENT", successCount);
+            writer.incrementUsageCounter(schemaName, "EMAIL_MESSAGES_FAILED", failureCount);
+            writer.incrementUsageCounter(schemaName, "EMAIL_RECIPIENTS_TOTAL", message.recipients().size());
 
             publishResult(message, successCount, failureCount, failures);
 
