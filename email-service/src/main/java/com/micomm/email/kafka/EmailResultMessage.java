@@ -7,6 +7,10 @@ import java.util.UUID;
 /**
  * Kafka message published to "email.result.v1" after processing completes
  * (fully or partially). Allows async status tracking / notifications.
+ *
+ * One message per chunk of a send: totalRecipients / successCount /
+ * failureCount are the chunk's; sendRecipientCount is the whole send's, so a
+ * consumer knows the send is done when the chunks' counts add up to it.
  */
 public record EmailResultMessage(
         UUID requestId,
@@ -16,7 +20,10 @@ public record EmailResultMessage(
         int successCount,
         int failureCount,
         List<FailureDetail> failures,
-        OffsetDateTime processedAt
+        OffsetDateTime processedAt,
+        int chunkIndex,
+        int chunkCount,
+        int sendRecipientCount
 ) {
     public record FailureDetail(String recipient, String reason) {}
 }

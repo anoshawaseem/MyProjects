@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.micomm.common.dto.ApiResponse;
@@ -37,12 +38,14 @@ public class InternalProviderAccountController {
             @RequestHeader("X-Internal-Api-Key") String apiKey,
             @PathVariable UUID clubId,
             @PathVariable UUID productId,
-            @PathVariable String channel) {
+            @PathVariable String channel,
+            // The module the send comes from: its own provider wins over the product's, if it has one.
+            @RequestParam(required = false) String module) {
 
         if (!internalApiKey.equals(apiKey)) {
             throw new AccessDeniedException("Invalid internal API key");
         }
 
-        return ApiResponse.ok(resolutionService.resolve(clubId, productId, channel));
+        return ApiResponse.ok(resolutionService.resolve(clubId, productId, channel, module));
     }
 }

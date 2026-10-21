@@ -1,6 +1,10 @@
 package com.micomm.tenantmgmt.auth;
 
+import com.micomm.common.audit.AuditActions;
+import com.micomm.common.audit.AuditEvent;
 import com.micomm.common.security.JwtTokenProvider;
+import com.micomm.common.security.MicommActor;
+import com.micomm.tenantmgmt.audit.ClubAuditLog;
 import com.micomm.tenantmgmt.auth.dto.LoginRequest;
 import com.micomm.tenantmgmt.auth.dto.LoginResponse;
 import com.micomm.tenantmgmt.auth.dto.RefreshRequest;
@@ -20,14 +24,17 @@ public class AuthService {
     private final UserRepository userRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final JwtTokenProvider jwtTokenProvider;
+    private final ClubAuditLog clubAuditLog;
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     public AuthService(UserRepository userRepository,
                         RefreshTokenRepository refreshTokenRepository,
-                        JwtTokenProvider jwtTokenProvider) {
+                        JwtTokenProvider jwtTokenProvider,
+                        ClubAuditLog clubAuditLog) {
         this.userRepository = userRepository;
         this.refreshTokenRepository = refreshTokenRepository;
         this.jwtTokenProvider = jwtTokenProvider;
+        this.clubAuditLog = clubAuditLog;
     }
 
     @Transactional
@@ -36,15 +43,18 @@ public class AuthService {
                 .orElseThrow(() -> new IllegalArgumentException("Invalid credentials"));
 
         if (!"ACTIVE".equals(user.getStatus())) {
+            auditLogin(user, AuditActions.USER_LOGIN_FAILED, "account disabled");
             throw new IllegalStateException("User account is disabled");
         }
 
         if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
+            auditLogin(user, AuditActions.USER_LOGIN_FAILED, "wrong password");
             throw new IllegalArgumentException("Invalid credentials");
         }
 
           String accessToken = jwtTokenProvider.generateAccessToken(
-                user.getId(), user.getRole().name(), user.getClubId());
+                user.getId(), user.getRole().name(), user.getClubId(), user.getEmail());
+        auditLogin(user, AuditActions.USER_LOGIN, null);
 
         String rawRefreshToken = UUID.randomUUID().toString();
         RefreshToken refreshToken = new RefreshToken();
@@ -58,6 +68,15 @@ public class AuthService {
 
         return new LoginResponse(
                 accessToken, rawRefreshToken, user.getRole().name(), user.getClubId());
+    }
+
+    /** Sign-ins of club users go to their club's audit log; platform admins belong to no club. */
+    private void auditLogin(User user, String action, String reason) {
+        if (user.getClubId() != null) {
+            clubAuditLog.record(AuditEvent.of(user.getClubId(), null, action, "USER", user.getId())
+                    .with("reason", reason)
+                    .by(MicommActor.user(user.getId(), user.getEmail())));
+        }
     }
 
     @Transactional
@@ -75,7 +94,7 @@ public class AuthService {
                 .orElseThrow(() -> new IllegalStateException("User no longer exists"));
 
         String accessToken = jwtTokenProvider.generateAccessToken(
-                user.getId(), user.getRole().name(), user.getClubId());
+                user.getId(), user.getRole().name(), user.getClubId(), user.getEmail());
 
         stored.setRevoked(true);
         refreshTokenRepository.save(stored);

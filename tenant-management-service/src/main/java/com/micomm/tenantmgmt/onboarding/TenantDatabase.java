@@ -6,7 +6,8 @@ import java.time.OffsetDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "tenant_databases")
+@Table(name = "tenant_databases", uniqueConstraints = @UniqueConstraint(name = "uq_tenant_databases_club_product", columnNames = {
+        "club_id", "product_id" }))
 public class TenantDatabase {
 
     @Id
@@ -40,19 +41,63 @@ public class TenantDatabase {
     @Column(name = "updated_at", nullable = false)
     private OffsetDateTime updatedAt = OffsetDateTime.now();
 
-    public UUID getId() { return id; }
-    public UUID getClubId() { return clubId; }
-    public void setClubId(UUID clubId) { this.clubId = clubId; }
-    public UUID getProductId() { return productId; }
-    public void setProductId(UUID productId) { this.productId = productId; }
-    public String getDatabaseIdentifier() { return databaseIdentifier; }
-    public void setDatabaseIdentifier(String databaseIdentifier) { this.databaseIdentifier = databaseIdentifier; }
-    public String getDatabaseHostReference() { return databaseHostReference; }
-    public void setDatabaseHostReference(String databaseHostReference) { this.databaseHostReference = databaseHostReference; }
-    public String getDatabaseSecretReference() { return databaseSecretReference; }
-    public void setDatabaseSecretReference(String databaseSecretReference) { this.databaseSecretReference = databaseSecretReference; }
-    public String getStatus() { return status; }
-    public void setStatus(String status) { this.status = status; }
-    public String getSchemaVersion() { return schemaVersion; }
-    public void setSchemaVersion(String schemaVersion) { this.schemaVersion = schemaVersion; }
+    public UUID getId() {
+        return id;
+    }
+
+    public UUID getClubId() {
+        return clubId;
+    }
+
+    public void setClubId(UUID clubId) {
+        this.clubId = clubId;
+    }
+
+    public UUID getProductId() {
+        return productId;
+    }
+
+    public void setProductId(UUID productId) {
+        this.productId = productId;
+    }
+
+    public String getDatabaseIdentifier() {
+        return databaseIdentifier;
+    }
+
+    public void setDatabaseIdentifier(String databaseIdentifier) {
+        this.databaseIdentifier = databaseIdentifier;
+    }
+
+    public String getDatabaseHostReference() {
+        return databaseHostReference;
+    }
+
+    public void setDatabaseHostReference(String databaseHostReference) {
+        this.databaseHostReference = databaseHostReference;
+    }
+
+    public String getDatabaseSecretReference() {
+        return databaseSecretReference;
+    }
+
+    public void setDatabaseSecretReference(String databaseSecretReference) {
+        this.databaseSecretReference = databaseSecretReference;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
+
+    public String getSchemaVersion() {
+        return schemaVersion;
+    }
+
+    public void setSchemaVersion(String schemaVersion) {
+        this.schemaVersion = schemaVersion;
+    }
 }

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { listAllProducts, createProduct, updateProduct, deleteProduct } from "../api/productService";
 import ConfirmDialog from "../components/ConfirmDialog";
-import { ArrowLeft, Plus, Trash2, Package, Loader2, CheckCircle2, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Package, Loader2, CheckCircle2, AlertTriangle, Home } from "lucide-react";
 
 export default function ProductsPage() {
     const [products, setProducts] = useState([]);
@@ -73,6 +73,9 @@ export default function ProductsPage() {
     return (
         <div className="min-h-screen bg-gray-50">
             <header className="flex items-center gap-3 px-8 py-4 bg-white border-b border-gray-200 shadow-sm">
+                <Link to="/dashboard" className="text-gray-500 hover:text-gray-800" title="Home">
+                    <Home className="w-5 h-5" />
+                </Link>
                 <Link to="/" className="text-gray-500 hover:text-gray-800">
                     <ArrowLeft className="w-5 h-5" />
                 </Link>

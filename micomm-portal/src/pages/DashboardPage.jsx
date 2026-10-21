@@ -4,7 +4,7 @@ import { useAuth } from "../context/AuthContext";
 import * as clubService from "../api/organizationService";
 import ProductMultiSelect from "../components/ProductMultiSelect";
 import KpiCards from "../components/KpiCards";
-import { setClubProducts, getClubProducts } from "../api/productService";
+import { setClubProducts, getClubProducts, listAllProducts } from "../api/productService";
 import { COUNTRIES } from "../constants/countries";
 import { getTimezones } from "../constants/timezones";
 import {
@@ -17,13 +17,18 @@ import {
     Package,
     ListChecks,
     Settings,
+    FileText,
+    KeyRound,
+    History,
 } from "lucide-react";
 import { forwardRef } from "react";
+import { useNavigate } from "react-router-dom";
 
 const TIMEZONES = getTimezones();
 
 export default function DashboardPage() {
     const { logout, role } = useAuth();
+    const navigate = useNavigate();
 
     const [name, setName] = useState("");
     const [slug, setSlug] = useState("");
@@ -49,6 +54,9 @@ export default function DashboardPage() {
     const [productPromptClubId, setProductPromptClubId] = useState(null);
     const [savingPromptProducts, setSavingPromptProducts] = useState(false);
     const [viewingClub, setViewingClub] = useState(null);
+    const [templatePromptClub, setTemplatePromptClub] = useState(null);
+    const [templateProductOptions, setTemplateProductOptions] = useState([]);
+    const [loadingTemplateProducts, setLoadingTemplateProducts] = useState(false);
 
     useEffect(() => {
         refreshClubList();
@@ -234,6 +242,40 @@ export default function DashboardPage() {
             handleTriggerOnboarding();
             setConfirmAction(null);
         }
+    }
+
+    async function handleOpenTemplatePicker(clubItem) {
+        setTemplatePromptClub(clubItem);
+        setLoadingTemplateProducts(true);
+        try {
+            const [clubProducts, allProducts] = await Promise.all([
+                getClubProducts(clubItem.id),
+                listAllProducts(),
+            ]);
+            const productMap = new Map(allProducts.map((p) => [p.id, p]));
+            const options = clubProducts
+                .filter((cp) => cp.status === "ACTIVE")
+                .map((cp) => productMap.get(cp.productId))
+                .filter(Boolean);
+            setTemplateProductOptions(options);
+        } catch (err) {
+            console.error("Failed to load products for template picker:", err);
+            setTemplateProductOptions([]);
+        } finally {
+            setLoadingTemplateProducts(false);
+        }
+    }
+
+    function handleCloseTemplatePicker() {
+        setTemplatePromptClub(null);
+        setTemplateProductOptions([]);
+    }
+
+    function handleSelectTemplateProduct(productId) {
+        if (!templatePromptClub) return;
+        const clubId = templatePromptClub.id;
+        handleCloseTemplatePicker();
+        navigate(`/clubs/${clubId}/products/${productId}/email-templates`);
     }
 
     return (
@@ -469,6 +511,24 @@ export default function DashboardPage() {
                                                     >
                                                         <Settings className="w-3.5 h-3.5" /> Providers
                                                     </Link>
+                                                    <Link
+                                                        to={`/clubs/${c.id}/api-keys`}
+                                                        className="flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:underline"
+                                                    >
+                                                        <KeyRound className="w-3.5 h-3.5" /> API keys
+                                                    </Link>
+                                                    <Link
+                                                        to={`/clubs/${c.id}/audit-log`}
+                                                        className="flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:underline"
+                                                    >
+                                                        <History className="w-3.5 h-3.5" /> Audit log
+                                                    </Link>
+                                                    <button
+                                                        onClick={() => handleOpenTemplatePicker(c)}
+                                                        className="flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:underline text-left"
+                                                    >
+                                                        <FileText className="w-3.5 h-3.5" /> Templates
+                                                    </button>
                                                 </div>
                                             </td>
                                         </tr>
@@ -588,6 +648,57 @@ export default function DashboardPage() {
                                 Close
                             </button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {templatePromptClub && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center"
+                    onClick={handleCloseTemplatePicker}
+                >
+                    <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+                    <div
+                        className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <button
+                            onClick={handleCloseTemplatePicker}
+                            className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
+                        >
+                            ✕
+                        </button>
+
+                        <SectionHeader icon={FileText} title={`Email Templates — ${templatePromptClub.name}`} />
+
+                        {loadingTemplateProducts ? (
+                            <div className="flex items-center gap-2 text-sm text-gray-500 py-4">
+                                <Loader2 className="w-4 h-4 animate-spin" /> Loading products...
+                            </div>
+                        ) : templateProductOptions.length === 0 ? (
+                            <p className="text-sm text-gray-500">
+                                No active products assigned to this club yet. Assign a product and an email
+                                provider first.
+                            </p>
+                        ) : (
+                            <>
+                                <p className="text-sm text-gray-500 mb-4">
+                                    Select a product to manage its email templates:
+                                </p>
+                                <div className="flex flex-col gap-2">
+                                    {templateProductOptions.map((p) => (
+                                        <button
+                                            key={p.id}
+                                            onClick={() => handleSelectTemplateProduct(p.id)}
+                                            className="flex items-center justify-between px-4 py-3 border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors text-left"
+                                        >
+                                            {p.name}
+                                            <FileText className="w-4 h-4 text-indigo-600" />
+                                        </button>
+                                    ))}
+                                </div>
+                            </>
+                        )}
                     </div>
                 </div>
             )}

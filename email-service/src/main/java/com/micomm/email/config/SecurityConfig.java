@@ -13,17 +13,25 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.micomm.common.security.JwtAuthFilter;
 import com.micomm.common.security.JwtTokenProvider;
+import com.micomm.email.client.TenantManagementClient;
+import com.micomm.email.security.ApiKeyAuthFilter;
 
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
 
     private final JwtTokenProvider jwtTokenProvider;
+    private final TenantManagementClient tenantManagementClient;
+    private final ObjectMapper objectMapper;
 
-    public SecurityConfig(JwtTokenProvider jwtTokenProvider) {
+    public SecurityConfig(JwtTokenProvider jwtTokenProvider, TenantManagementClient tenantManagementClient,
+            ObjectMapper objectMapper) {
         this.jwtTokenProvider = jwtTokenProvider;
+        this.tenantManagementClient = tenantManagementClient;
+        this.objectMapper = objectMapper;
     }
 
     @Bean
@@ -37,6 +45,9 @@ public class SecurityConfig {
                 .anyRequest().authenticated()
             )
             .addFilterBefore(new JwtAuthFilter(jwtTokenProvider),
+                    UsernamePasswordAuthenticationFilter.class)
+            // Runs after the JWT filter, so an X-Api-Key header decides who the caller is.
+            .addFilterBefore(new ApiKeyAuthFilter(tenantManagementClient, objectMapper),
                     UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

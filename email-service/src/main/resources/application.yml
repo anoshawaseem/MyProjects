@@ -24,6 +24,14 @@ micomm:
     access-token-expiry-minutes: 120
     refresh-token-expiry-days: 7
 
+  email:
+    # Recipients per Kafka message; each message is sent by one worker thread.
+    send-chunk-size: 500
+    # Chunks one instance processes at once.
+    consumer-concurrency: 3
+    # Emails sent at once within a chunk (per instance: consumer-concurrency x this).
+    send-parallelism: 10
+
   internal:
     api-key: ${INTERNAL_API_KEY:change-me-in-prod}
     tenant-management-base-url: ${TENANT_MGMT_BASE_URL:http://localhost:8081}
@@ -38,6 +46,8 @@ micomm:
 kafka:
   topics:
     email-send: email.send.v1
+    # Caps how many chunks run at once across all instances; can be raised later, never lowered.
+    email-send-partitions: 6
     email-result: email.result.v1
 
 logging:

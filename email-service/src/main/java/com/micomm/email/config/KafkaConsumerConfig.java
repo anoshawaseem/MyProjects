@@ -40,11 +40,14 @@ public class KafkaConsumerConfig {
 
     @Bean
     public ConcurrentKafkaListenerContainerFactory<String, EmailSendMessage> emailSendKafkaListenerContainerFactory(
-            ConsumerFactory<String, EmailSendMessage> emailSendConsumerFactory) {
+            ConsumerFactory<String, EmailSendMessage> emailSendConsumerFactory,
+            // Chunks this instance processes at once (one per partition it owns; more than the
+            // topic's partitions would sit idle).
+            @Value("${micomm.email.consumer-concurrency:3}") int concurrency) {
         ConcurrentKafkaListenerContainerFactory<String, EmailSendMessage> factory =
                 new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(emailSendConsumerFactory);
-        factory.setConcurrency(3);
+        factory.setConcurrency(concurrency);
         return factory;
     }
 }

@@ -8,5 +8,8 @@ import java.util.UUID;
 
 public interface TenantDatabaseRepository extends JpaRepository<TenantDatabase, UUID> {
     List<TenantDatabase> findByClubId(UUID clubId);
+
     Optional<TenantDatabase> findByClubIdAndProductId(UUID clubId, UUID productId);
+
+    List<TenantDatabase> findAllByDatabaseIdentifier(String databaseIdentifier);
 }

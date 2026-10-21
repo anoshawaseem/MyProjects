@@ -10,9 +10,9 @@ import javax.sql.DataSource;
 
 /**
  * Shared connection pool to the single physical "micomm_platform" database
- * that hosts every tenant's schema (tenant_{club}_{product}). The active
- * schema is selected per-operation via SET search_path, not via multiple
- * DataSources.
+ * that hosts every tenant's schema (tenant_{club}). Statements address
+ * tenant tables with schema-qualified names (see TenantTables), not via
+ * SET search_path or multiple DataSources.
  */
 @Configuration
 public class PlatformDataSourceConfig {
@@ -26,6 +26,8 @@ public class PlatformDataSourceConfig {
         config.setMaximumPoolSize(10);
         config.setMinimumIdle(2);
         config.setPoolName("email-service-platform-pool");
+        // Lets pgjdbc collapse JDBC batches into multi-row INSERTs (recipient writes).
+        config.addDataSourceProperty("reWriteBatchedInserts", "true");
         return new HikariDataSource(config);
     }
 

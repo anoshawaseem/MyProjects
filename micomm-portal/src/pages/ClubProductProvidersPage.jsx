@@ -8,8 +8,12 @@ import {
     createProviderAccount,
     getClubProductProviders,
     assignClubProductProvider,
+    getModuleProviders,
+    assignModuleProvider,
+    clearModuleProvider,
 } from "../api/providerService";
-import { ArrowLeft, Plug, Plus, Loader2, CheckCircle2, AlertTriangle, Mail, MessageSquare, Send } from "lucide-react";
+import { getClubModules } from "../api/moduleService";
+import { ArrowLeft, Plug, Plus, Loader2, CheckCircle2, AlertTriangle, Mail, MessageSquare, Send, FileText, Home, Blocks } from "lucide-react";
 
 const EMPTY_CONFIG = {
     SENDGRID: { apiKey: "", fromEmail: "" },
@@ -25,6 +29,10 @@ export default function ClubProductProvidersPage() {
     const [accounts, setAccounts] = useState([]);
     const [selectedProductId, setSelectedProductId] = useState(null);
     const [assignments, setAssignments] = useState({ EMAIL: "", SMS: "" });
+    // Modules switched on for the selected product, and the ones with their own provider:
+    // { "MEMBERSHIP:EMAIL": providerAccountId, ... }.
+    const [modules, setModules] = useState([]);
+    const [moduleAssignments, setModuleAssignments] = useState({});
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [message, setMessage] = useState(null);
@@ -73,13 +81,43 @@ export default function ClubProductProvidersPage() {
 
     async function loadAssignments(productId) {
         try {
-            const mappings = await getClubProductProviders(clubId, productId);
+            const [mappings, clubModules, moduleMappings] = await Promise.all([
+                getClubProductProviders(clubId, productId),
+                getClubModules(clubId, productId).catch(() => ({ modules: [] })),
+                getModuleProviders(clubId, productId).catch(() => []),
+            ]);
             const next = { EMAIL: "", SMS: "" };
             mappings.forEach((m) => { next[m.channel] = m.providerAccountId; });
             setAssignments(next);
+            setModules(clubModules.modules.filter((m) => m.enabled));
+            setModuleAssignments(Object.fromEntries(
+                moduleMappings.map((m) => [`${m.moduleCode}:${m.channel}`, m.providerAccountId])
+            ));
         } catch (err) {
-            setError(err.response?.data?.message ?? "Failed to load provider assignments");
+            setError(err.response?.data?.errorMessage ?? err.response?.data?.message ?? "Failed to load provider assignments");
         }
+    }
+
+    async function handleModuleAssign(moduleCode, moduleName, channel, providerAccountId) {
+        setError(null);
+        setMessage(null);
+        try {
+            const updated = providerAccountId
+                ? await assignModuleProvider(clubId, selectedProductId, moduleCode, channel, providerAccountId)
+                : await clearModuleProvider(clubId, selectedProductId, moduleCode, channel);
+            setModuleAssignments(Object.fromEntries(
+                updated.map((m) => [`${m.moduleCode}:${m.channel}`, m.providerAccountId])
+            ));
+            setMessage(providerAccountId
+                ? `${moduleName} now sends ${channel} through its own provider.`
+                : `${moduleName} now uses the product's ${channel} provider.`);
+        } catch (err) {
+            setError(err.response?.data?.errorMessage ?? "Failed to update module provider");
+        }
+    }
+
+    function providerAccountName(id) {
+        return accounts.find((a) => a.id === id)?.name;
     }
 
     function selectedTypeCode() {
@@ -159,6 +197,9 @@ export default function ClubProductProvidersPage() {
     return (
         <div className="min-h-screen bg-gray-50">
             <header className="flex items-center gap-3 px-8 py-4 bg-white border-b border-gray-200 shadow-sm">
+                <Link to="/dashboard" className="text-gray-500 hover:text-gray-800" title="Home">
+                    <Home className="w-5 h-5" />
+                </Link>
                 <Link to="/" className="text-gray-500 hover:text-gray-800">
                     <ArrowLeft className="w-5 h-5" />
                 </Link>
@@ -400,6 +441,39 @@ export default function ClubProductProvidersPage() {
                                     )}
                                 </div>
                             )}
+
+                            {selectedProductId && modules.length > 0 && (
+                                <div className="mt-6 pt-6 border-t border-gray-100">
+                                    <div className="flex items-center gap-2.5 mb-1">
+                                        <Blocks className="w-5 h-5 text-indigo-600" />
+                                        <h3 className="text-sm font-bold text-gray-800">Per-module providers</h3>
+                                    </div>
+                                    <p className="text-sm text-gray-500 mb-4">
+                                        A module can send through its own provider account. Modules left on
+                                        "Use product's provider" use the provider chosen above.
+                                    </p>
+                                    <div className="flex flex-col gap-3">
+                                        {modules.map((m) => (
+                                            <div key={m.code} className="p-4 rounded-xl border border-gray-200">
+                                                <p className="text-sm font-semibold text-gray-800 mb-3">{m.name}</p>
+                                                <div className="flex flex-col gap-2">
+                                                    {[["EMAIL", Mail], ["SMS", MessageSquare]].map(([channel, Icon]) => (
+                                                        <ModuleChannelSelector
+                                                            key={channel}
+                                                            icon={Icon}
+                                                            label={channel === "EMAIL" ? "Email" : "SMS"}
+                                                            value={moduleAssignments[`${m.code}:${channel}`] ?? ""}
+                                                            defaultName={providerAccountName(assignments[channel])}
+                                                            options={accountsForChannel(channel)}
+                                                            onChange={(id) => handleModuleAssign(m.code, m.name, channel, id)}
+                                                        />
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </section>
 
                         {message && (
@@ -415,6 +489,24 @@ export default function ClubProductProvidersPage() {
                     </>
                 )}
             </main>
+        </div>
+    );
+}
+
+/** "" means the module uses the product's provider for this channel. */
+function ModuleChannelSelector({ icon: Icon, label, value, defaultName, options, onChange }) {
+    return (
+        <div className="flex flex-wrap items-center gap-3">
+            <Icon className="w-4 h-4 text-gray-400" />
+            <span className="text-sm text-gray-600 w-12">{label}</span>
+            <select value={value} onChange={(e) => onChange(e.target.value)} className="input flex-1 min-w-0">
+                <option value="">
+                    {defaultName ? `Use product's provider (${defaultName})` : "Use product's provider (none set)"}
+                </option>
+                {options.map((a) => (
+                    <option key={a.id} value={a.id}>{a.name}</option>
+                ))}
+            </select>
         </div>
     );
 }

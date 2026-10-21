@@ -23,6 +23,11 @@ public class JwtTokenProvider {
     }
 
     public String generateAccessToken(UUID userId, String role, UUID clubId) {
+        return generateAccessToken(userId, role, clubId, null);
+    }
+
+    /** email is carried so other services can name the user in audit logs without a lookup. */
+    public String generateAccessToken(UUID userId, String role, UUID clubId, String email) {
         Date now = new Date();
         Date expiry = new Date(now.getTime() + properties.getAccessTokenExpiryMinutes() * 60_000);
 
@@ -35,6 +40,9 @@ public class JwtTokenProvider {
 
         if (clubId != null) {
             builder.claim("club_id", clubId.toString());
+        }
+        if (email != null) {
+            builder.claim("email", email);
         }
 
         return builder.compact();
@@ -59,5 +67,10 @@ public class JwtTokenProvider {
     public UUID getClubId(Claims claims) {
         String clubId = claims.get("club_id", String.class);
         return clubId != null ? UUID.fromString(clubId) : null;
+    }
+
+    /** Null for tokens issued before the email claim was added. */
+    public String getEmail(Claims claims) {
+        return claims.get("email", String.class);
     }
 }

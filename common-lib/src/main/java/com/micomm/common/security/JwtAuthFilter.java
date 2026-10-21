@@ -51,6 +51,8 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
                 var authentication = new UsernamePasswordAuthenticationToken(
                         principal, null, authorities);
+                // Who to name in audit logs (see MicommActor.current()).
+                authentication.setDetails(MicommActor.user(userId, jwtTokenProvider.getEmail(claims)));
 
                 SecurityContextHolder.getContext().setAuthentication(authentication);
 

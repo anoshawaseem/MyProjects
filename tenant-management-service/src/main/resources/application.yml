@@ -32,3 +32,9 @@ micomm:
 
   internal:
     api-key: ${INTERNAL_API_KEY:change-me-in-prod}
+
+  # Monthly partitions of tenant log tables (email_logs, email_log_recipients, sms_logs, audit_logs).
+  partitioning:
+    months-ahead: 3          # partitions pre-created beyond the current month
+    retention-months: 0      # 0 = keep everything; N = drop partitions older than N months
+    cron: "0 0 2 * * *"      # daily maintenance (also runs once at startup)

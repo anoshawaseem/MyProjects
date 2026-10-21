@@ -1,6 +1,9 @@
 package com.micomm.tenantmgmt.product;
 
+import com.micomm.common.audit.AuditActions;
+import com.micomm.common.audit.AuditEvent;
 import com.micomm.common.dto.ApiResponse;
+import com.micomm.tenantmgmt.audit.ClubAuditLog;
 import com.micomm.common.security.MicommAuthenticatedUser;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -14,9 +17,11 @@ import java.util.UUID;
 public class ClubProductController {
 
     private final ClubProductService clubProductService;
+    private final ClubAuditLog clubAuditLog;
 
-    public ClubProductController(ClubProductService clubProductService) {
+    public ClubProductController(ClubProductService clubProductService, ClubAuditLog clubAuditLog) {
         this.clubProductService = clubProductService;
+        this.clubAuditLog = clubAuditLog;
     }
 
     @GetMapping
@@ -39,7 +44,10 @@ public class ClubProductController {
         if (!currentUser.isOrgAdmin()) {
             throw new SecurityException("Only ORG_ADMIN can manage club products");
         }
-        return ApiResponse.ok(clubProductService.setProductsForClub(clubId, request.productIds()));
+        List<ClubProduct> products = clubProductService.setProductsForClub(clubId, request.productIds());
+        clubAuditLog.record(AuditEvent.of(clubId, null, AuditActions.CLUB_PRODUCTS_UPDATED, "CLUB", clubId)
+                .with("productIds", request.productIds()));
+        return ApiResponse.ok(products);
     }
 
     public record SetProductsRequest(Set<UUID> productIds) {}

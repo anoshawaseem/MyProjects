@@ -26,6 +26,27 @@ export async function getClubProductProviders(clubId, productId) {
     return res.data.data;
 }
 
+/** Modules that send through their own account: [{ moduleCode, channel, providerAccountId }]. */
+export async function getModuleProviders(clubId, productId) {
+    const res = await apiClient.get(`/clubs/${clubId}/products/${productId}/module-providers`);
+    return res.data.data;
+}
+
+export async function assignModuleProvider(clubId, productId, moduleCode, channel, providerAccountId) {
+    const res = await apiClient.put(`/clubs/${clubId}/products/${productId}/module-providers`, {
+        moduleCode, channel, providerAccountId,
+    });
+    return res.data.data;
+}
+
+/** The module goes back to the product's provider for this channel. */
+export async function clearModuleProvider(clubId, productId, moduleCode, channel) {
+    const res = await apiClient.delete(`/clubs/${clubId}/products/${productId}/module-providers`, {
+        params: { moduleCode, channel },
+    });
+    return res.data.data;
+}
+
 export async function assignClubProductProvider(clubId, productId, channel, providerAccountId) {
     const res = await apiClient.put(`/clubs/${clubId}/products/${productId}/providers`, {
         channel, providerAccountId,
