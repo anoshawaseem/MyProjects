@@ -21,9 +21,15 @@ public final class AuditActions {
     public static final String MODULE_PROVIDER_CLEARED = "MODULE_PROVIDER_CLEARED";
     public static final String API_KEY_CREATED = "API_KEY_CREATED";
     public static final String API_KEY_REVOKED = "API_KEY_REVOKED";
+    public static final String OAUTH_CLIENT_REGISTERED = "OAUTH_CLIENT_REGISTERED";
+    public static final String OAUTH_CLIENT_REVOKED = "OAUTH_CLIENT_REVOKED";
+    public static final String OAUTH_TOKEN_ISSUED = "OAUTH_TOKEN_ISSUED";
+    public static final String OAUTH_TOKEN_DENIED = "OAUTH_TOKEN_DENIED";
 
     // Email (email-service)
     public static final String EMAIL_SEND_QUEUED = "EMAIL_SEND_QUEUED";
+    /** A send to several channels (EMAIL / SMS / WHATSAPP) at once. */
+    public static final String NOTIFICATION_SEND_QUEUED = "NOTIFICATION_SEND_QUEUED";
     public static final String TEMPLATE_CREATED = "TEMPLATE_CREATED";
     public static final String TEMPLATE_UPDATED = "TEMPLATE_UPDATED";
     public static final String TEMPLATE_DELETED = "TEMPLATE_DELETED";

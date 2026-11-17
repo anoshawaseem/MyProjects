@@ -57,7 +57,7 @@ class MergeFieldsTest {
     private static EmailSendMessage message(Map<String, String> variables, List<Map<String, String>> perRecipient) {
         return new EmailSendMessage(UUID.randomUUID(), "k", UUID.randomUUID(), UUID.randomUUID(), "club@x.com",
                 "Hi {{memberName}}", "<p>{{clubName}}</p>", List.of("a@x.com", "b@x.com"), null, null, null,
-                variables, perRecipient, 0, 1, 2);
+                variables, perRecipient, 0, 1, 2, "TRANSACTIONAL");
     }
 
     @Test

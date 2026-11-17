@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import com.micomm.common.dto.ApiResponse;
 import com.micomm.tenantmgmt.club.SlugAlreadyExistsException;
 import com.micomm.tenantmgmt.module.ModuleValidationException;
+import com.micomm.tenantmgmt.provider.ProviderNotConfiguredException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -18,6 +19,16 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(SlugAlreadyExistsException.class)
     public ResponseEntity<ApiResponse<Void>> handleSlugExists(SlugAlreadyExistsException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiResponse.error(ex.getMessage()));
+    }
+
+    /**
+     * A club/product/channel with no usable provider is a setup gap, not a server fault: 404 lets
+     * callers (email-service) tell it apart from an outage and give the user a proper message.
+     */
+    @ExceptionHandler(ProviderNotConfiguredException.class)
+    public ResponseEntity<ApiResponse<Void>> handleProviderNotConfigured(ProviderNotConfiguredException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(ApiResponse.error(ex.getMessage()));
     }
 

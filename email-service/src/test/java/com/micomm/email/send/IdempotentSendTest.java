@@ -133,10 +133,22 @@ class IdempotentSendTest {
     void invalidRequestFreesTheKey() {
         when(store.claim(eq(CLUB), eq("k1"), anyString(), any())).thenReturn(Optional.empty());
         SendBulkEmailRequest noContent = new SendBulkEmailRequest(CLUB, PRODUCT, "club@x.com", null, null, null,
-                null, null, null, List.of(EmailRecipient.of("a@x.com")));
+                null, null, null, List.of(EmailRecipient.of("a@x.com")), null);
 
         assertThatThrownBy(() -> service.submit(noContent, "k1")).isInstanceOf(IllegalArgumentException.class);
         verify(store).release(CLUB, "k1");
+    }
+
+    @Test
+    void kafkaDownIsA503AndFreesTheKeyBecauseNothingWasSent() {
+        when(store.claim(eq(CLUB), eq("k1"), anyString(), any())).thenReturn(Optional.empty());
+        when(kafka.send(anyString(), anyString(), any()))
+                .thenThrow(new org.springframework.kafka.KafkaException("Send failed"));
+
+        assertThatThrownBy(() -> service.submit(request(Map.of()), "k1"))
+                .isInstanceOf(QueueUnavailableException.class).hasMessageContaining("nothing was sent");
+        verify(store).release(CLUB, "k1");
+        verify(store, never()).fail(any(), any(), org.mockito.ArgumentMatchers.anyInt());
     }
 
     @Test
@@ -152,6 +164,6 @@ class IdempotentSendTest {
 
     private static SendBulkEmailRequest request(Map<String, String> recipientVariables) {
         return new SendBulkEmailRequest(CLUB, PRODUCT, "club@x.com", "Hi", "<p>Hi</p>", null, null, null, null,
-                List.of(new EmailRecipient("a@x.com", recipientVariables)));
+                List.of(new EmailRecipient("a@x.com", recipientVariables)), null);
     }
 }

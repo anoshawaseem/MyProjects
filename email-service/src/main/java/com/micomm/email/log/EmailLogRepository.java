@@ -69,16 +69,21 @@ public class EmailLogRepository {
     }
 
     /**
-     * Newest-first logs for a product in [from, to). When afterCreatedAt/afterId
+     * Newest-first logs for a product in [from, to), optionally with a subject containing
+     * {@code subject} (a LIKE pattern, case-insensitive). When afterCreatedAt/afterId
      * are given, returns rows strictly after that keyset position.
      */
-    public List<EmailLogSummaryDto> findSummaries(String schemaName, UUID productId, Instant from, Instant to,
-            Instant afterCreatedAt, UUID afterId, int limit) {
+    public List<EmailLogSummaryDto> findSummaries(String schemaName, UUID productId, String subjectPattern,
+            Instant from, Instant to, Instant afterCreatedAt, UUID afterId, int limit) {
         StringBuilder sql = new StringBuilder(
                 "SELECT id, product_id, subject, status, recipient_count, success_count, failure_count, "
                         + "sent_at, created_at FROM " + table(schemaName, "email_logs")
                         + " WHERE product_id = ? AND created_at >= ? AND created_at < ?");
         List<Object> args = new ArrayList<>(List.of(productId, Timestamp.from(from), Timestamp.from(to)));
+        if (subjectPattern != null) {
+            sql.append(" AND subject ILIKE ? ESCAPE '\\'");
+            args.add(subjectPattern);
+        }
         if (afterCreatedAt != null) {
             sql.append(" AND (created_at, id) < (?, ?)");
             args.add(Timestamp.from(afterCreatedAt));

@@ -1,0 +1,73 @@
+{
+  "info": {
+    "name": "MiComm - Multi-channel send",
+    "description": "Send one message on several channels (EMAIL, SMS, WHATSAPP) to several recipients.\n\nRun '1. Login' first: it saves the access token into the collection variable 'token', which '2. Send notification' uses.\n\nEvery requested channel needs an active provider account for the club + product (club_product_providers), otherwise the send is rejected.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "tenantUrl", "value": "http://localhost:8081" },
+    { "key": "emailUrl", "value": "http://localhost:8082" },
+    { "key": "loginEmail", "value": "", "description": "Portal user's email" },
+    { "key": "loginPassword", "value": "", "description": "Portal user's password; set as a current value, don't save it in the collection" },
+    { "key": "token", "value": "" },
+    { "key": "clubId", "value": "34da9b7a-f6a6-4aec-b479-3c847a441ed8", "description": "MBYC" },
+    { "key": "productId", "value": "f721333c-d2ff-4276-a09e-0e8a573d562d", "description": "MiClub" }
+  ],
+  "item": [
+    {
+      "name": "1. Login",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const body = pm.response.json();",
+              "pm.test('login succeeded', () => pm.expect(body.success).to.eql(true));",
+              "pm.collectionVariables.set('token', body.data.accessToken);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{tenantUrl}}/auth/login",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{loginEmail}}\",\n  \"password\": \"{{loginPassword}}\"\n}"
+        }
+      }
+    },
+    {
+      "name": "2. Send notification (EMAIL + SMS + WHATSAPP, 3 recipients)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('accepted (202)', () => pm.response.to.have.status(202));",
+              "const body = pm.response.json();",
+              "if (body.data) { console.log('requestId', body.data.requestId, 'per channel', JSON.stringify(body.data.channels)); }"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{token}}" },
+          { "key": "Idempotency-Key", "value": "{{$guid}}", "description": "New key per click; reuse a fixed key to test replay (response header Idempotent-Replayed: true)" },
+          { "key": "X-Api-Key", "value": "mck_...", "description": "Alternative to the Bearer token: a club API key", "disabled": true }
+        ],
+        "url": "{{emailUrl}}/api/v1/notifications/send",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"clubId\": \"{{clubId}}\",\n  \"productId\": \"{{productId}}\",\n  \"channels\": [\"EMAIL\", \"SMS\", \"WHATSAPP\"],\n  \"type\": \"TRANSACTIONAL\",\n  \"title\": \"Regatta schedule update\",\n  \"body\": \"Hi {{firstName}}, the Saturday regatta now starts at {{startTime}}. See you at the club!\",\n  \"email\": {\n    \"subject\": \"{{clubName}}: regatta starts at {{startTime}}\",\n    \"html\": \"<p>Hi {{firstName}},</p><p>The Saturday regatta now starts at <b>{{startTime}}</b>.</p><p>See you at {{clubName}}!</p>\"\n  },\n  \"sms\": {\n    \"text\": \"{{clubName}}: Hi {{firstName}}, Saturday regatta now starts at {{startTime}}.\"\n  },\n  \"variables\": {\n    \"startTime\": \"10:30 AM\"\n  },\n  \"recipients\": [\n    {\n      \"email\": \"recipient1@example.com\",\n      \"phone\": \"+447700900101\",\n      \"variables\": { \"firstName\": \"Ali\" }\n    },\n    {\n      \"email\": \"recipient2@example.com\",\n      \"phone\": \"+447700900102\",\n      \"whatsapp\": \"+447700900202\",\n      \"variables\": { \"firstName\": \"Sara\" }\n    },\n    {\n      \"email\": \"recipient3@example.com\",\n      \"variables\": { \"firstName\": \"Omar\", \"startTime\": \"11:00 AM\" }\n    }\n  ]\n}"
+        }
+      }
+    }
+  ]
+}

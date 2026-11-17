@@ -12,6 +12,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -23,9 +24,21 @@ import java.util.UUID;
 public class JwtAuthFilter extends OncePerRequestFilter {
 
     private final JwtTokenProvider jwtTokenProvider;
+    private final boolean acceptClientTokens;
 
+    /** Accepts user tokens only; applications' (OAuth client) tokens are ignored. */
     public JwtAuthFilter(JwtTokenProvider jwtTokenProvider) {
+        this(jwtTokenProvider, false);
+    }
+
+    /**
+     * @param acceptClientTokens whether OAuth applications' access tokens authenticate here. A
+     *        service that does not enforce their scopes must pass false, so those requests stay
+     *        unauthenticated.
+     */
+    public JwtAuthFilter(JwtTokenProvider jwtTokenProvider, boolean acceptClientTokens) {
         this.jwtTokenProvider = jwtTokenProvider;
+        this.acceptClientTokens = acceptClientTokens;
     }
 
     @Override
@@ -39,22 +52,35 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             String token = header.substring(7);
             try {
                 Claims claims = jwtTokenProvider.parseClaims(token);
+                boolean clientToken = jwtTokenProvider.isClientToken(claims);
 
-                UUID userId = jwtTokenProvider.getUserId(claims);
-                String role = jwtTokenProvider.getRole(claims);
-                UUID clubId = jwtTokenProvider.getClubId(claims);
+                if (!clientToken || acceptClientTokens) {
+                    UUID userId = jwtTokenProvider.getUserId(claims);
+                    String role = jwtTokenProvider.getRole(claims);
+                    UUID clubId = jwtTokenProvider.getClubId(claims);
 
-                MicommAuthenticatedUser principal =
-                        new MicommAuthenticatedUser(userId, role, clubId);
+                    MicommAuthenticatedUser principal =
+                            new MicommAuthenticatedUser(userId, role, clubId);
 
-                var authorities = List.of(new SimpleGrantedAuthority("ROLE_" + role));
+                    List<SimpleGrantedAuthority> authorities = new ArrayList<>();
+                    authorities.add(new SimpleGrantedAuthority("ROLE_" + role));
+                    if (clientToken) {
+                        // Marks the request so a scope check can limit it to the token's scopes.
+                        authorities.add(new SimpleGrantedAuthority(ClientScopes.CLIENT_TOKEN_AUTHORITY));
+                        jwtTokenProvider.getScopes(claims)
+                                .forEach(s -> authorities.add(new SimpleGrantedAuthority(ClientScopes.authority(s))));
+                    }
 
-                var authentication = new UsernamePasswordAuthenticationToken(
-                        principal, null, authorities);
-                // Who to name in audit logs (see MicommActor.current()).
-                authentication.setDetails(MicommActor.user(userId, jwtTokenProvider.getEmail(claims)));
+                    var authentication = new UsernamePasswordAuthenticationToken(
+                            principal, null, authorities);
+                    // Who to name in audit logs (see MicommActor.current()).
+                    authentication.setDetails(clientToken
+                            ? MicommActor.apiClient(userId, jwtTokenProvider.getClientName(claims),
+                                    jwtTokenProvider.getClientId(claims))
+                            : MicommActor.user(userId, jwtTokenProvider.getEmail(claims)));
 
-                SecurityContextHolder.getContext().setAuthentication(authentication);
+                    SecurityContextHolder.getContext().setAuthentication(authentication);
+                }
 
             } catch (JwtException | IllegalArgumentException ex) {
                 System.out.println("JWT validation failed: " + ex.getMessage());

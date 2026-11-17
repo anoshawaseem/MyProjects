@@ -71,7 +71,7 @@ public class AuditLogQueryService {
         StringBuilder sql = new StringBuilder("SELECT id, created_at, product_id, actor_email, action, entity_type,"
                 + " entity_id, details FROM \"" + schemaName + "\".audit_logs WHERE true");
         List<Object> args = new ArrayList<>();
-        if (TenantSchemaLayout.CLUB_SCOPED.version().equals(schema.get().getSchemaVersion())) {
+        if (TenantSchemaLayout.hasClubIdColumn(schema.get().getSchemaVersion())) {
             sql.append(" AND club_id = ?");
             args.add(clubId);
         }

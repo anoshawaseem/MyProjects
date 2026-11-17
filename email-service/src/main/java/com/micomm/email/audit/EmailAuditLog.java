@@ -36,7 +36,7 @@ public class EmailAuditLog {
     public void record(UUID viaProductId, AuditEvent event) {
         try {
             TenantDatabaseDto tenant = tenantManagementClient.resolveTenantDatabase(event.clubId(), viaProductId);
-            writer.write(tenant.schemaName(), tenant.clubScoped(), event);
+            writer.write(tenant.schemaName(), tenant.hasClubIdColumn(), event);
         } catch (RuntimeException ex) {
             log.error("Could not record audit event {} for club {}", event.action(), event.clubId(), ex);
         }

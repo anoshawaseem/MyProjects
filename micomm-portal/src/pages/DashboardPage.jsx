@@ -18,8 +18,8 @@ import {
     ListChecks,
     Settings,
     FileText,
-    KeyRound,
     History,
+    AppWindow,
 } from "lucide-react";
 import { forwardRef } from "react";
 import { useNavigate } from "react-router-dom";
@@ -443,7 +443,9 @@ export default function DashboardPage() {
                         accent="border-emerald-200 bg-emerald-50"
                     >
                         <div className="flex flex-col gap-3">
-                            {tenantDatabase.map((db) => (
+                            {/* Every product of a club shares the club's one schema, so onboarding
+                                returns the same schema once per product: show each schema once. */}
+                            {[...new Map(tenantDatabase.map((db) => [db.databaseIdentifier, db])).values()].map((db) => (
                                 <InfoGrid key={db.databaseIdentifier}>
                                     <InfoRow label="Schema" value={db.databaseIdentifier} mono />
                                     <InfoRow label="Status" value={<StatusPill status={db.status} />} />
@@ -512,10 +514,10 @@ export default function DashboardPage() {
                                                         <Settings className="w-3.5 h-3.5" /> Providers
                                                     </Link>
                                                     <Link
-                                                        to={`/clubs/${c.id}/api-keys`}
+                                                        to={`/clubs/${c.id}/apps`}
                                                         className="flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:underline"
                                                     >
-                                                        <KeyRound className="w-3.5 h-3.5" /> API keys
+                                                        <AppWindow className="w-3.5 h-3.5" /> Apps
                                                     </Link>
                                                     <Link
                                                         to={`/clubs/${c.id}/audit-log`}

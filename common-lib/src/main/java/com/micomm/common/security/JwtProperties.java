@@ -11,9 +11,6 @@ public class JwtProperties {
     /** Access token expiry in minutes. */
     private long accessTokenExpiryMinutes = 30;
 
-    /** Refresh token expiry in days. */
-    private long refreshTokenExpiryDays = 7;
-
     public String getSecret() {
         return secret;
     }
@@ -28,13 +25,5 @@ public class JwtProperties {
 
     public void setAccessTokenExpiryMinutes(long accessTokenExpiryMinutes) {
         this.accessTokenExpiryMinutes = accessTokenExpiryMinutes;
-    }
-
-    public long getRefreshTokenExpiryDays() {
-        return refreshTokenExpiryDays;
-    }
-
-    public void setRefreshTokenExpiryDays(long refreshTokenExpiryDays) {
-        this.refreshTokenExpiryDays = refreshTokenExpiryDays;
     }
 }

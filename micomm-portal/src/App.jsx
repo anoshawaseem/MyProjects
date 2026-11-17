@@ -8,7 +8,9 @@ import ClubProductsPage from "./pages/ClubProductsPage";
 import ClubProductProvidersPage from "./pages/ClubProductProvidersPage";
 import ClubApiKeysPage from "./pages/ClubApiKeysPage";
 import ClubAuditLogPage from "./pages/ClubAuditLogPage";
+import ClubAppsPage from "./pages/ClubAppsPage";
 import SendTestEmailPage from "./pages/SendTestEmailPage";
+import SendTestSmsPage from "./pages/SendTestSmsPage";
 import EmailTemplatesPage from "./pages/EmailTemplatesPage";
 
 export default function App() {
@@ -50,6 +52,14 @@ export default function App() {
                         }
                     />
                     <Route
+                        path="/clubs/:clubId/apps"
+                        element={
+                            <ProtectedRoute>
+                                <ClubAppsPage />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
                         path="/clubs/:clubId/audit-log"
                         element={
                             <ProtectedRoute>
@@ -70,6 +80,14 @@ export default function App() {
                         element={
                             <ProtectedRoute>
                                 <SendTestEmailPage />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/clubs/:clubId/products/:productId/test-sms"
+                        element={
+                            <ProtectedRoute>
+                                <SendTestSmsPage />
                             </ProtectedRoute>
                         }
                     />

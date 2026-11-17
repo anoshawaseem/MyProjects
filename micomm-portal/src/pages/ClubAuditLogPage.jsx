@@ -3,7 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import * as clubService from "../api/organizationService";
 import { getClubProducts, listAllProducts } from "../api/productService";
 import { listAuditLogs } from "../api/auditLogService";
-import { AlertTriangle, ArrowLeft, Bot, History, Home, KeyRound, Loader2, User } from "lucide-react";
+import { AlertTriangle, AppWindow, ArrowLeft, Bot, History, Home, KeyRound, Loader2, User } from "lucide-react";
 
 /** Readable names for the actions MiComm records (common-lib AuditActions). */
 const ACTIONS = {
@@ -19,6 +19,10 @@ const ACTIONS = {
     MODULE_PROVIDER_CLEARED: "Module provider removed",
     API_KEY_CREATED: "API key created",
     API_KEY_REVOKED: "API key revoked",
+    OAUTH_CLIENT_REGISTERED: "App registered",
+    OAUTH_CLIENT_REVOKED: "App revoked",
+    OAUTH_TOKEN_ISSUED: "App signed in",
+    OAUTH_TOKEN_DENIED: "App sign-in refused",
     EMAIL_SEND_QUEUED: "Email sent",
     TEMPLATE_CREATED: "Template created",
     TEMPLATE_UPDATED: "Template edited",
@@ -28,7 +32,7 @@ const ACTIONS = {
     GLOBAL_TEMPLATE_DELETED: "Global template deleted",
 };
 
-const ACTOR_ICONS = { USER: User, API_KEY: KeyRound, SYSTEM: Bot };
+const ACTOR_ICONS = { USER: User, API_KEY: KeyRound, API_CLIENT: AppWindow, SYSTEM: Bot };
 
 // Shown in the details column; actorType/actorId/ip have their own columns or are internal.
 const HIDDEN_DETAILS = new Set(["actorType", "actorId", "ip"]);
@@ -221,7 +225,7 @@ export default function ClubAuditLogPage() {
                                                         )}
                                                     </td>
                                                     <td className="py-3 pr-4 whitespace-nowrap">
-                                                        <span className={`font-semibold ${e.action === "USER_LOGIN_FAILED" ? "text-red-600" : "text-gray-800"}`}>
+                                                        <span className={`font-semibold ${e.action === "USER_LOGIN_FAILED" || e.action === "OAUTH_TOKEN_DENIED" ? "text-red-600" : "text-gray-800"}`}>
                                                             {ACTIONS[e.action] ?? e.action}
                                                         </span>
                                                     </td>

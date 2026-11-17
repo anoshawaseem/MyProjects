@@ -38,11 +38,12 @@ public class NotificationController {
             @RequestParam UUID productId,
             @RequestParam(required = false) String module,
             @RequestParam(required = false) String channel,
+            @RequestParam(required = false) String subject,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime to,
             @RequestParam(required = false) String cursor,
             @RequestParam(required = false) Integer limit) {
-        return ApiResponse.ok(service.list(clubId, productId, module, channel, from, to, cursor, limit));
+        return ApiResponse.ok(service.list(clubId, productId, module, channel, subject, from, to, cursor, limit));
     }
 
     @GetMapping("/{id}")

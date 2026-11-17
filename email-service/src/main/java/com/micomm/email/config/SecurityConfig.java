@@ -18,6 +18,7 @@ import com.micomm.common.security.JwtAuthFilter;
 import com.micomm.common.security.JwtTokenProvider;
 import com.micomm.email.client.TenantManagementClient;
 import com.micomm.email.security.ApiKeyAuthFilter;
+import com.micomm.email.security.ClientScopeFilter;
 
 @Configuration
 @EnableWebSecurity
@@ -44,8 +45,10 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/emails/**").authenticated()
                 .anyRequest().authenticated()
             )
-            .addFilterBefore(new JwtAuthFilter(jwtTokenProvider),
+            // Users' tokens and applications' OAuth tokens; ClientScopeFilter limits the latter.
+            .addFilterBefore(new JwtAuthFilter(jwtTokenProvider, true),
                     UsernamePasswordAuthenticationFilter.class)
+            .addFilterAfter(new ClientScopeFilter(objectMapper), UsernamePasswordAuthenticationFilter.class)
             // Runs after the JWT filter, so an X-Api-Key header decides who the caller is.
             .addFilterBefore(new ApiKeyAuthFilter(tenantManagementClient, objectMapper),
                     UsernamePasswordAuthenticationFilter.class);

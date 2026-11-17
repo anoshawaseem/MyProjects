@@ -20,7 +20,6 @@ micomm:
   jwt:
     secret: "dGhpc2lzYXRlc3RzZWNyZXRrZXlmb3Jqd3RzaWduaW5nMzJieXRlcw=="
     access-token-expiry-minutes: 120
-    refresh-token-expiry-days: 7
 
   provisioning:
     host: localhost
@@ -32,6 +31,15 @@ micomm:
 
   internal:
     api-key: ${INTERNAL_API_KEY:change-me-in-prod}
+
+  # OAuth 2.0 for applications (client credentials + private key JWT, POST /oauth/token).
+  oauth:
+    # This endpoint's public URL; applications must put it in their assertions' "aud".
+    # Comma-separate several (e.g. internal and public URLs).
+    token-audience: ${OAUTH_TOKEN_AUDIENCE:http://localhost:8081/oauth/token}
+    token-lifetime: 15m          # how long an issued access token works
+    max-assertion-lifetime: 5m   # longest an application's signed assertion may be valid
+    clock-skew: 30s              # tolerated clock difference with applications
 
   # Monthly partitions of tenant log tables (email_logs, email_log_recipients, sms_logs, audit_logs).
   partitioning:

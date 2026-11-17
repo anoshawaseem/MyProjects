@@ -27,6 +27,12 @@ import java.util.UUID;
  * send it in parallel. {@code totalRecipients} is the whole send's count.
  * Messages published before chunking have chunkCount 0: one chunk holding
  * every recipient.
+ *
+ * Multi-channel sends (POST /api/v1/notifications/send) publish their EMAIL part as these
+ * messages, sharing the requestId with the other channels' {@link ChannelSendMessage}s:
+ * {@code channelCount} is how many channels the send has and {@code notificationRecipientCount}
+ * how many people it went to (some may have no email address). Both are 0 / null in email-only
+ * sends and older messages.
  */
 public record EmailSendMessage(
         UUID requestId,
@@ -44,8 +50,32 @@ public record EmailSendMessage(
         List<Map<String, String>> recipientVariables,
         int chunkIndex,
         int chunkCount,
-        int totalRecipients
+        int totalRecipients,
+        // TRANSACTIONAL or CAMPAIGN; null in messages published before it was added.
+        String type,
+        int channelCount,
+        Integer notificationRecipientCount
 ) {
+
+    /** Email-only send. */
+    public EmailSendMessage(UUID requestId, String idempotencyKey, UUID clubId, UUID productId, String fromEmail,
+            String subject, String htmlBody, List<String> recipients, OffsetDateTime submittedAt, String moduleCode,
+            UUID templateId, Map<String, String> variables, List<Map<String, String>> recipientVariables,
+            int chunkIndex, int chunkCount, int totalRecipients, String type) {
+        this(requestId, idempotencyKey, clubId, productId, fromEmail, subject, htmlBody, recipients, submittedAt,
+                moduleCode, templateId, variables, recipientVariables, chunkIndex, chunkCount, totalRecipients, type,
+                0, null);
+    }
+
+    /** Channels the whole send goes out on (1 for email-only sends). */
+    public int sendChannelCount() {
+        return Math.max(channelCount, 1);
+    }
+
+    /** People the whole send went to; for email-only sends, its email recipients. */
+    public int notificationRecipients() {
+        return notificationRecipientCount != null ? notificationRecipientCount : sendRecipientCount();
+    }
 
     /** Recipients of the whole send (older messages: the one chunk's). */
     public int sendRecipientCount() {

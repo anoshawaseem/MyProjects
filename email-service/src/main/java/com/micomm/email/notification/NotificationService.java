@@ -36,7 +36,10 @@ import com.micomm.email.tenant.TenantModules;
 public class NotificationService {
 
     public static final String EMAIL = "EMAIL";
+    private static final String TRANSACTIONAL = NotificationType.TRANSACTIONAL.name();
     public static final Set<String> CHANNELS = Set.of(EMAIL, "SMS", "PUSH", "WHATSAPP");
+    /** Subjects are at most 500 characters, so a longer search can never match. */
+    static final int MAX_SUBJECT_SEARCH = 500;
 
     private final NotificationRepository repository;
     private final EmailLogRepository legacyEmailRepository;
@@ -51,10 +54,17 @@ public class NotificationService {
         this.clubAccessGuard = clubAccessGuard;
     }
 
-    /** module: only sends made from that product module (module-aware clubs; none for older clubs). */
+    /**
+     * module: only sends made from that product module (module-aware clubs; none for older clubs).
+     * subject: only sends whose subject contains it, ignoring case (channels without a subject never match).
+     */
     public PageDto<NotificationSummaryDto> list(UUID clubId, UUID productId, String module, String channel,
-            OffsetDateTime from, OffsetDateTime to, String cursor, Integer limit) {
+            String subject, OffsetDateTime from, OffsetDateTime to, String cursor, Integer limit) {
         String ch = normalizeChannel(channel);
+        String subjectSearch = subject == null || subject.isBlank() ? null : subject.strip();
+        if (subjectSearch != null && subjectSearch.length() > MAX_SUBJECT_SEARCH) {
+            throw new IllegalArgumentException("subject must be at most " + MAX_SUBJECT_SEARCH + " characters");
+        }
         String moduleCode = TenantModules.normalize(module);
         Range range = KeysetPaging.range(from, to);
         int pageSize = KeysetPaging.pageSize(limit);
@@ -70,10 +80,13 @@ public class NotificationService {
             if (moduleCode != null) {
                 TenantModules.requireEnabled(tenant, moduleCode);
             }
-            rows = repository.findSummaries(tenant, clubId, productId, moduleCode, ch, range.start(), range.end(),
-                    after != null ? after.createdAt() : null, after != null ? after.id() : null, pageSize + 1);
+            rows = repository.findSummaries(tenant, clubId, productId, moduleCode, ch, subjectSearch, range.start(),
+                    range.end(), after != null ? after.createdAt() : null, after != null ? after.id() : null,
+                    pageSize + 1);
         } else if (ch == null || EMAIL.equals(ch)) {
-            rows = legacyEmailRepository.findSummaries(tenant.schemaName(), productId, range.start(), range.end(),
+            rows = legacyEmailRepository.findSummaries(tenant.schemaName(), productId,
+                    subjectSearch != null ? NotificationRepository.subjectContains(subjectSearch) : null,
+                    range.start(), range.end(),
                     after != null ? after.createdAt() : null, after != null ? after.id() : null, pageSize + 1)
                     .stream().map(NotificationService::fromLegacy).toList();
         } else {
@@ -142,12 +155,12 @@ public class NotificationService {
     // Legacy email_logs.body holds the HTML body, and legacy rows have no sender.
 
     private static NotificationSummaryDto fromLegacy(EmailLogSummaryDto l) {
-        return new NotificationSummaryDto(l.id(), l.productId(), EMAIL, null, l.subject(), l.status(),
+        return new NotificationSummaryDto(l.id(), l.productId(), TRANSACTIONAL, EMAIL, null, l.subject(), l.status(),
                 l.recipientCount(), l.successCount(), l.failureCount(), l.sentAt(), l.createdAt());
     }
 
     private static NotificationDetailDto fromLegacy(EmailLogDetailDto l) {
-        return new NotificationDetailDto(l.id(), l.productId(), EMAIL, null, l.subject(), null, l.body(), null,
+        return new NotificationDetailDto(l.id(), l.productId(), TRANSACTIONAL, EMAIL, null, l.subject(), null, l.body(), null,
                 l.status(), l.recipientCount(), l.successCount(), l.failureCount(), l.sentAt(), l.createdAt());
     }
 

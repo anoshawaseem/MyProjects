@@ -22,7 +22,6 @@ apiClient.interceptors.response.use(
         // let the calling component handle and display that error instead.
         if (status === 401) {
             localStorage.removeItem("accessToken");
-            localStorage.removeItem("refreshToken");
             window.location.href = "/login";
         }
 

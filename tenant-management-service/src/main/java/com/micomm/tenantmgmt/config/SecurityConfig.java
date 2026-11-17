@@ -33,12 +33,15 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/auth/login", "/auth/refresh").permitAll()
+                .requestMatchers("/auth/login").permitAll()
+                // Applications authenticate here with a signed assertion, not a token.
+                .requestMatchers("/oauth/token").permitAll()
                 .requestMatchers("/internal/**").permitAll()
                 .requestMatchers("/clubs/**").authenticated()
                 .anyRequest().authenticated()
             )
-            .addFilterBefore(new JwtAuthFilter(jwtTokenProvider),
+            // Users' tokens only: applications' OAuth tokens must not manage clubs, keys or apps.
+            .addFilterBefore(new JwtAuthFilter(jwtTokenProvider, false),
                     UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

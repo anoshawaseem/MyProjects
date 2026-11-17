@@ -128,14 +128,14 @@ public class EmailMessageWriter {
      * Adds the given deltas to today's usage_counters rows for a club + product
      * in a single atomic upsert. Safe across concurrent workers/instances thanks
      * to the unique key on (product_id, metric_name, period_start), or
-     * (club_id, product_id, metric_name, period_start) in club-scoped schemas.
+     * (club_id, product_id, metric_name, period_start) in layout "3" schemas.
      */
     public void incrementUsageCounters(TenantDatabaseDto tenant, UUID clubId, UUID productId,
             Map<String, Long> deltas) {
         if (deltas.isEmpty()) {
             return;
         }
-        boolean clubScoped = tenant.clubScoped();
+        boolean clubScoped = tenant.hasClubIdColumn();
 
         OffsetDateTime periodStart = OffsetDateTime.now().truncatedTo(ChronoUnit.DAYS);
         Timestamp start = Timestamp.from(periodStart.toInstant());

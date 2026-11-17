@@ -52,7 +52,7 @@ class EmailSendChunkingTest {
                 .mapToObj(i -> new EmailRecipient("m" + i + "@x.com", Map.of("memberName", "M" + i)))
                 .toList();
         var response = service.submit(new SendBulkEmailRequest(clubId, productId, "club@x.com",
-                "Hi {{memberName}}", "<p>{{clubName}}</p>", null, null, null, null, recipients), null).response();
+                "Hi {{memberName}}", "<p>{{clubName}}</p>", null, null, null, null, recipients, null), null).response();
 
         ArgumentCaptor<EmailSendMessage> sent = ArgumentCaptor.forClass(EmailSendMessage.class);
         ArgumentCaptor<String> keys = ArgumentCaptor.forClass(String.class);

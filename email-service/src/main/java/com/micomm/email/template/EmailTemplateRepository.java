@@ -21,11 +21,11 @@ import java.util.UUID;
  * (unchanged behaviour)</li>
  * <li>notifications ("2"): notification_templates rows with channel = 'EMAIL',
  * scoped to the product</li>
- * <li>club-scoped ("3"): notification_templates rows with channel = 'EMAIL',
- * scoped to club_id + product_id and to the given product modules</li>
+ * <li>"3" and "4": notification_templates rows with channel = 'EMAIL', scoped to
+ * product_id (plus club_id in "3") and to the given product modules</li>
  * </ul>
- * For layout "3", {@code modules} is the set of modules the caller may see; an
- * empty set matches nothing. It is ignored for the older layouts.
+ * For layouts "3" and "4", {@code modules} is the set of modules the caller may see;
+ * an empty set matches nothing. It is ignored for the older layouts.
  */
 @Component
 public class EmailTemplateRepository {
@@ -65,14 +65,19 @@ public class EmailTemplateRepository {
     }
 
     private static Scope scope(TenantDatabaseDto tenant, UUID clubId, UUID productId, List<String> modules) {
-        if (tenant.clubScoped()) {
-            List<Object> args = new ArrayList<>(List.of(clubId, productId));
+        if (tenant.supportsModules()) {
+            List<Object> args = new ArrayList<>();
+            if (tenant.hasClubIdColumn()) {
+                args.add(clubId);
+            }
+            args.add(productId);
             args.addAll(modules);
             // An empty module set must match nothing; "IN ()" is not valid SQL.
             String moduleFilter = modules.isEmpty() ? " AND false"
                     : " AND module_code IN (" + String.join(", ", Collections.nCopies(modules.size(), "?")) + ")";
             return new Scope(table(tenant.schemaName(), "notification_templates"), COLUMNS + MODULE_COLUMNS,
-                    " AND club_id = ? AND product_id = ?" + moduleFilter + " AND channel = 'EMAIL'", args);
+                    (tenant.hasClubIdColumn() ? " AND club_id = ?" : "") + " AND product_id = ?" + moduleFilter
+                            + " AND channel = 'EMAIL'", args);
         }
         if (tenant.usesNotificationsLayout()) {
             return new Scope(table(tenant.schemaName(), "notification_templates"), COLUMNS + NO_MODULE_COLUMNS,
@@ -101,7 +106,7 @@ public class EmailTemplateRepository {
         return results.stream().findFirst();
     }
 
-    /** Layout "3" only: the club's template for a module template type (e.g. MEMBERSHIP / WELCOME). */
+    /** Layouts "3" and "4" only: the club's template for a module template type (e.g. MEMBERSHIP / WELCOME). */
     public Optional<EmailTemplateDto> findByKey(TenantDatabaseDto tenant, UUID clubId, UUID productId,
             String moduleCode, String templateKey) {
         Scope s = scope(tenant, clubId, productId, List.of(moduleCode));
@@ -113,16 +118,23 @@ public class EmailTemplateRepository {
         return results.stream().findFirst();
     }
 
-    /** moduleCode / templateKey are stored for layout "3" only (the caller enforces that). */
+    /** moduleCode / templateKey are stored for layouts "3" and "4" only (the caller enforces that). */
     public UUID create(TenantDatabaseDto tenant, UUID clubId, UUID productId, String moduleCode,
             String templateKey, String name, String subject, String body) {
         UUID id = UUID.randomUUID();
-        if (tenant.clubScoped()) {
+        if (tenant.hasClubIdColumn()) {
             jdbcTemplate.update(
                     "INSERT INTO " + table(tenant.schemaName(), "notification_templates")
                             + " (id, club_id, product_id, module_code, template_key, channel, name, subject, body,"
                             + " created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'EMAIL', ?, ?, ?, now(), now())",
                     id, clubId, productId, moduleCode, templateKey, name, subject, body
+            );
+        } else if (tenant.supportsModules()) {
+            jdbcTemplate.update(
+                    "INSERT INTO " + table(tenant.schemaName(), "notification_templates")
+                            + " (id, product_id, module_code, template_key, channel, name, subject, body,"
+                            + " created_at, updated_at) VALUES (?, ?, ?, ?, 'EMAIL', ?, ?, ?, now(), now())",
+                    id, productId, moduleCode, templateKey, name, subject, body
             );
         } else if (tenant.usesNotificationsLayout()) {
             jdbcTemplate.update(

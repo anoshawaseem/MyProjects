@@ -108,7 +108,7 @@ public class ModuleService {
     public ClubModulesDto clubModules(UUID clubId, UUID productId) {
         ClubProduct clubProduct = requireClubProduct(clubId, productId);
         boolean supportsModules = tenantDatabaseRepository.findByClubIdAndProductId(clubId, productId)
-                .map(db -> TenantSchemaLayout.CLUB_SCOPED.version().equals(db.getSchemaVersion()))
+                .map(db -> TenantSchemaLayout.supportsModules(db.getSchemaVersion()))
                 .orElse(false);
         return new ClubModulesDto(supportsModules, moduleRepository.findClubModules(clubProduct.getId(), productId));
     }
@@ -137,7 +137,7 @@ public class ModuleService {
             tenant = tenantDatabaseRepository.findByClubIdAndProductId(clubId, productId)
                     .orElseThrow(() -> new ModuleValidationException(
                             "The club has no schema for this product yet; onboard it first"));
-            if (!TenantSchemaLayout.CLUB_SCOPED.version().equals(tenant.getSchemaVersion())) {
+            if (!TenantSchemaLayout.supportsModules(tenant.getSchemaVersion())) {
                 throw new ModuleValidationException("This club's schema (layout " + tenant.getSchemaVersion()
                         + ") predates modules; modules are available for clubs created since");
             }

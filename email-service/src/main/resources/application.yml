@@ -22,7 +22,6 @@ micomm:
   jwt:
     secret: "dGhpc2lzYXRlc3RzZWNyZXRrZXlmb3Jqd3RzaWduaW5nMzJieXRlcw=="
     access-token-expiry-minutes: 120
-    refresh-token-expiry-days: 7
 
   email:
     # Recipients per Kafka message; each message is sent by one worker thread.
@@ -31,6 +30,10 @@ micomm:
     consumer-concurrency: 3
     # Emails sent at once within a chunk (per instance: consumer-concurrency x this).
     send-parallelism: 10
+
+  twilio:
+    # Overridable to point SMS / WhatsApp at a test server.
+    base-url: ${TWILIO_BASE_URL:https://api.twilio.com}
 
   internal:
     api-key: ${INTERNAL_API_KEY:change-me-in-prod}
@@ -49,6 +52,9 @@ kafka:
     # Caps how many chunks run at once across all instances; can be raised later, never lowered.
     email-send-partitions: 6
     email-result: email.result.v1
+    # SMS / WhatsApp chunks of multi-channel sends (POST /api/v1/notifications/send).
+    channel-send: notification.send.v1
+    channel-send-partitions: 6
 
 logging:
   level:

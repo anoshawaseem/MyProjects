@@ -56,8 +56,8 @@ public class InternalTenantDatabaseController {
             throw new TenantOnboardingException("Tenant schema is not active", clubId);
         }
 
-        // Modules exist only in club-scoped schemas; older layouts never report any.
-        List<String> modules = TenantSchemaLayout.CLUB_SCOPED.version().equals(db.getSchemaVersion())
+        // Modules exist only in layouts "3" and "4"; older layouts never report any.
+        List<String> modules = TenantSchemaLayout.supportsModules(db.getSchemaVersion())
                 ? moduleService.enabledModuleCodes(clubId, productId)
                 : List.of();
         String clubName = clubRepository.findById(clubId).map(Club::getName).orElse(null);

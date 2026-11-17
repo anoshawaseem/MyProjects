@@ -41,7 +41,7 @@ public class ClubAuditLog {
                 return;
             }
             writer.write(schema.get().getDatabaseIdentifier(),
-                    TenantSchemaLayout.CLUB_SCOPED.version().equals(schema.get().getSchemaVersion()), event);
+                    TenantSchemaLayout.hasClubIdColumn(schema.get().getSchemaVersion()), event);
         } catch (RuntimeException ex) {
             log.error("Could not record audit event {} for club {}", event.action(), event.clubId(), ex);
         }

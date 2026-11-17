@@ -8,10 +8,9 @@ import java.util.regex.Pattern;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
-import com.micomm.email.send.dto.SendBulkEmailRequest;
 import com.micomm.email.send.dto.SendBulkEmailResponse;
 
-/** Rules for the send endpoint's Idempotency-Key header. */
+/** Rules for the send endpoints' Idempotency-Key header. */
 public final class Idempotency {
 
     public static final String HEADER = "Idempotency-Key";
@@ -23,7 +22,7 @@ public final class Idempotency {
     }
 
     /** Null when no key was sent; rejects keys that are blank, too long or not printable ASCII. */
-    static String normalizeKey(String key) {
+    public static String normalizeKey(String key) {
         if (key == null) {
             return null;
         }
@@ -39,7 +38,7 @@ public final class Idempotency {
      * SHA-256 of the request as canonical JSON (map entries sorted), so the same request always
      * hashes the same however its JSON was ordered.
      */
-    static String requestHash(ObjectMapper objectMapper, SendBulkEmailRequest request) {
+    public static String requestHash(ObjectMapper objectMapper, Object request) {
         try {
             byte[] json = objectMapper.copy()
                     .configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true)
@@ -51,7 +50,7 @@ public final class Idempotency {
     }
 
     /** The answer for a request whose key was already used. */
-    static SendBulkEmailResponse replay(IdempotencyStore.Entry earlier, String requestHash) {
+    public static SendBulkEmailResponse replay(IdempotencyStore.Entry earlier, String requestHash) {
         if (!earlier.requestHash().equals(requestHash)) {
             throw new IdempotencyKeyReusedException();
         }

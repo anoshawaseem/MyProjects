@@ -15,7 +15,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
  */
 public record MicommActor(Type type, UUID id, String label) {
 
-    public enum Type { USER, API_KEY, SYSTEM }
+    public enum Type { USER, API_KEY, API_CLIENT, SYSTEM }
 
     public static final MicommActor SYSTEM = new MicommActor(Type.SYSTEM, null, "MiComm");
 
@@ -25,6 +25,11 @@ public record MicommActor(Type type, UUID id, String label) {
 
     public static MicommActor apiKey(UUID apiKeyId, String name, String keyPrefix) {
         return new MicommActor(Type.API_KEY, apiKeyId, "API key '" + name + "' (" + keyPrefix + ")");
+    }
+
+    /** An application signed in with OAuth (private key JWT). */
+    public static MicommActor apiClient(UUID clientUuid, String name, String clientId) {
+        return new MicommActor(Type.API_CLIENT, clientUuid, "App '" + name + "' (" + clientId + ")");
     }
 
     /** The current request's actor, or SYSTEM when there is no authenticated caller. */

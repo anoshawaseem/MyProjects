@@ -6,6 +6,7 @@ import com.micomm.email.log.EmailLogNotFoundException;
 import com.micomm.email.notification.NotificationNotFoundException;
 import com.micomm.email.provider.UnsupportedProviderException;
 import com.micomm.email.send.Idempotency;
+import com.micomm.email.send.QueueUnavailableException;
 import com.micomm.email.send.SendNotQueuedException;
 import com.micomm.email.template.EmailTemplateNotFoundException;
 import com.micomm.email.tenant.TenantModules;
@@ -95,6 +96,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Idempotency.IdempotencyKeyReusedException.class)
     @ResponseStatus(HttpStatus.UNPROCESSABLE_ENTITY)
     public ApiResponse<Void> handleIdempotencyKeyReused(Idempotency.IdempotencyKeyReusedException ex) {
+        return ApiResponse.error(ex.getMessage());
+    }
+
+    @ExceptionHandler(QueueUnavailableException.class)
+    @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
+    public ApiResponse<Void> handleQueueUnavailable(QueueUnavailableException ex) {
         return ApiResponse.error(ex.getMessage());
     }
 

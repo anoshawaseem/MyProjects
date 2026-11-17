@@ -21,6 +21,9 @@ import java.util.UUID;
  * recipient); otherwise it is sent exactly as given.
  *
  * recipients: ["a@x.com", ...] or [{"email": "a@x.com", "variables": {...}}, ...].
+ *
+ * type: TRANSACTIONAL (default) or CAMPAIGN. Stored for clubs on layout "5"; older clubs have no
+ * column for it.
  */
 public record SendBulkEmailRequest(
         @NotNull UUID clubId,
@@ -32,7 +35,8 @@ public record SendBulkEmailRequest(
         UUID templateId,
         @Size(max = 100) String templateKey,
         Map<String, String> variables,
-        @NotEmpty @Size(max = 5000) List<@NotNull @Valid EmailRecipient> recipients
+        @NotEmpty @Size(max = 5000) List<@NotNull @Valid EmailRecipient> recipients,
+        @Pattern(regexp = "^(?i)(TRANSACTIONAL|CAMPAIGN)$", message = "must be TRANSACTIONAL or CAMPAIGN") String type
 ) {
 
     public boolean usesTemplate() {

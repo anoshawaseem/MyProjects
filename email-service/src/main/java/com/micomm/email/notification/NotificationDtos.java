@@ -11,9 +11,11 @@ public final class NotificationDtos {
     }
 
     /** List view: no bodies, so list queries never touch TOASTed content. */
+    /** type: TRANSACTIONAL or CAMPAIGN (always TRANSACTIONAL for clubs before layout "5"). */
     public record NotificationSummaryDto(
             UUID id,
             UUID productId,
+            String type,
             String channel,
             String sender,
             String subject,
@@ -28,6 +30,7 @@ public final class NotificationDtos {
     public record NotificationDetailDto(
             UUID id,
             UUID productId,
+            String type,
             String channel,
             String sender,
             String subject,

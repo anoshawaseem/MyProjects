@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -88,13 +89,14 @@ public class EmailSendWorker {
                 message.requestId(), message.chunkIndex() + 1, Math.max(message.chunkCount(), 1),
                 message.clubId(), message.productId(), chunkSize);
 
+        TenantDatabaseDto tenantDb = null;
         SendRecord sendRecord = null;
         int successCount = 0;
         int failureCount = 0;
         List<EmailResultMessage.FailureDetail> failures = new ArrayList<>();
         List<Future<EmailSendResult>> sends = List.of();
         try {
-            TenantDatabaseDto tenantDb = tenantManagementClient.resolveTenantDatabase(
+            tenantDb = tenantManagementClient.resolveTenantDatabase(
                     message.clubId(), message.productId());
             // A module can have its own provider account; sends from no module use the product's.
             ResolvedProviderDto provider = tenantManagementClient.resolveProvider(
@@ -108,10 +110,7 @@ public class EmailSendWorker {
             // For merged sends that is the template with its {{placeholders}}, not each recipient's copy.
             OffsetDateTime createdAt = message.submittedAt() != null ? message.submittedAt() : OffsetDateTime.now();
             sendRecord = tenantDb.usesNotificationsLayout()
-                    ? notificationWriter.startNotification(tenantDb, message.requestId(), createdAt,
-                            message.clubId(), message.productId(), message.moduleCode(), message.templateId(),
-                            CHANNEL, message.fromEmail(), message.subject(), null, message.htmlBody(),
-                            message.sendRecipientCount())
+                    ? startNotification(tenantDb, message, createdAt, provider.providerAccountId())
                     : writer.startEmailLog(schemaName, message.requestId(), createdAt, message.productId(),
                             message.subject(), message.htmlBody(), message.sendRecipientCount());
 
@@ -160,8 +159,14 @@ public class EmailSendWorker {
             tenantManagementClient.evict(message.clubId(), message.productId());
             // Count the rest of the chunk as failed, so the send's row still reaches a final status.
             int unprocessed = chunkSize - successCount - failureCount;
-            if (sendRecord != null) {
+            // Layouts "5" / "6": if it failed before the delivery was written (e.g. no provider),
+            // write it now, as the notification waits for every channel's delivery.
+            if (sendRecord != null || (tenantDb != null && tenantDb.usesDeliveries())) {
                 try {
+                    if (sendRecord == null) {
+                        sendRecord = startNotification(tenantDb, message, message.submittedAt() != null
+                                ? message.submittedAt() : OffsetDateTime.now(), null);
+                    }
                     sendRecord.addResults(successCount, failureCount + unprocessed);
                 } catch (Exception recordEx) {
                     log.error("Could not record the failed chunk of request [{}]", message.requestId(), recordEx);
@@ -170,6 +175,14 @@ public class EmailSendWorker {
             failures.add(new EmailResultMessage.FailureDetail("*", "Processing error: " + ex.getMessage()));
             publishResult(message, successCount, failureCount + unprocessed, failures);
         }
+    }
+
+    private SendRecord startNotification(TenantDatabaseDto tenantDb, EmailSendMessage message,
+            OffsetDateTime createdAt, UUID providerAccountId) {
+        return notificationWriter.startNotification(tenantDb, message.requestId(), createdAt, message.clubId(),
+                message.productId(), message.moduleCode(), message.templateId(), CHANNEL, message.fromEmail(),
+                message.subject(), null, message.htmlBody(), message.sendRecipientCount(), message.type(),
+                providerAccountId, message.notificationRecipients(), message.sendChannelCount());
     }
 
     /** Starts every send of the chunk; at most {@code sendParallelism} run at once. */

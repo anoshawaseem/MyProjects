@@ -23,7 +23,7 @@ import jakarta.servlet.http.HttpServletRequest;
 /**
  * Writes audit entries into a club's own schema (its audit_logs table), so each club's log lives
  * and is deleted with the rest of its data. Every layout's audit_logs has the same columns, plus
- * club_id in club-scoped ("3") schemas:
+ * club_id in layout "3" schemas:
  * (id, [club_id,] product_id, actor_email, action, entity_type, entity_id, details, created_at).
  * actor_email holds the actor's readable label; details holds JSON with the actor's type and id,
  * the caller's IP address and the event's own details.
@@ -48,8 +48,8 @@ public class AuditLogWriter {
         this.objectMapper = objectMapper;
     }
 
-    /** @param clubScoped true for layout "3" schemas, whose audit_logs has a club_id column */
-    public void write(String schemaName, boolean clubScoped, AuditEvent event) {
+    /** @param hasClubIdColumn true for layout "3" schemas, whose audit_logs has a club_id column */
+    public void write(String schemaName, boolean hasClubIdColumn, AuditEvent event) {
         try {
             if (schemaName == null || !VALID_SCHEMA_NAME.matcher(schemaName).matches()) {
                 throw new IllegalArgumentException("Invalid schema name: " + schemaName);
@@ -73,7 +73,7 @@ public class AuditLogWriter {
             details.putAll(event.details());
 
             List<Object> args = new ArrayList<>();
-            if (clubScoped) {
+            if (hasClubIdColumn) {
                 args.add(event.clubId());
             }
             args.add(event.productId());
@@ -84,9 +84,9 @@ public class AuditLogWriter {
             args.add(objectMapper.writeValueAsString(details));
 
             platformJdbc.update("INSERT INTO \"" + schemaName + "\".audit_logs ("
-                    + (clubScoped ? "club_id, " : "")
+                    + (hasClubIdColumn ? "club_id, " : "")
                     + "product_id, actor_email, action, entity_type, entity_id, details, created_at) VALUES ("
-                    + (clubScoped ? "?, " : "") + "?, ?, ?, ?, ?, ?, now())", args.toArray());
+                    + (hasClubIdColumn ? "?, " : "") + "?, ?, ?, ?, ?, ?, now())", args.toArray());
         } catch (JsonProcessingException | RuntimeException ex) {
             log.error("Could not write audit log {} for club {} to schema [{}]", event.action(), event.clubId(),
                     schemaName, ex);

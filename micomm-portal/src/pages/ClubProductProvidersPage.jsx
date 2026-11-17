@@ -13,13 +13,19 @@ import {
     clearModuleProvider,
 } from "../api/providerService";
 import { getClubModules } from "../api/moduleService";
-import { ArrowLeft, Plug, Plus, Loader2, CheckCircle2, AlertTriangle, Mail, MessageSquare, Send, FileText, Home, Blocks } from "lucide-react";
+import { ArrowLeft, Plug, Plus, Loader2, CheckCircle2, AlertTriangle, Mail, MessageSquare, MessageCircle, Send, FileText, Home, Blocks } from "lucide-react";
 
 const EMPTY_CONFIG = {
     SENDGRID: { apiKey: "", fromEmail: "" },
     SMTP: { host: "", port: "587", username: "", password: "", fromEmail: "", useTls: true },
     TWILIO: { accountSid: "", authToken: "", fromNumber: "" },
+    TWILIO_WHATSAPP: { accountSid: "", authToken: "", fromNumber: "" },
 };
+
+/** Twilio SMS and Twilio WhatsApp take the same account fields. */
+const TWILIO_CODES = ["TWILIO", "TWILIO_WHATSAPP"];
+
+const MODULE_CHANNELS = [["EMAIL", Mail, "Email"], ["SMS", MessageSquare, "SMS"], ["WHATSAPP", MessageCircle, "WhatsApp"]];
 
 export default function ClubProductProvidersPage() {
     const { clubId } = useParams();
@@ -28,7 +34,7 @@ export default function ClubProductProvidersPage() {
     const [providerTypes, setProviderTypes] = useState([]);
     const [accounts, setAccounts] = useState([]);
     const [selectedProductId, setSelectedProductId] = useState(null);
-    const [assignments, setAssignments] = useState({ EMAIL: "", SMS: "" });
+    const [assignments, setAssignments] = useState({ EMAIL: "", SMS: "", WHATSAPP: "" });
     // Modules switched on for the selected product, and the ones with their own provider:
     // { "MEMBERSHIP:EMAIL": providerAccountId, ... }.
     const [modules, setModules] = useState([]);
@@ -86,7 +92,7 @@ export default function ClubProductProvidersPage() {
                 getClubModules(clubId, productId).catch(() => ({ modules: [] })),
                 getModuleProviders(clubId, productId).catch(() => []),
             ]);
-            const next = { EMAIL: "", SMS: "" };
+            const next = { EMAIL: "", SMS: "", WHATSAPP: "" };
             mappings.forEach((m) => { next[m.channel] = m.providerAccountId; });
             setAssignments(next);
             setModules(clubModules.modules.filter((m) => m.enabled));
@@ -156,7 +162,7 @@ export default function ClubProductProvidersPage() {
                     fromEmail: fields.fromEmail,
                     useTls: fields.useTls,
                 };
-            } else if (code === "TWILIO") {
+            } else if (TWILIO_CODES.includes(code)) {
                 secretReference = fields.authToken ?? "";
                 configJson = { accountSid: fields.accountSid, fromNumber: fields.fromNumber };
             }
@@ -345,7 +351,7 @@ export default function ClubProductProvidersPage() {
                                     </>
                                 )}
 
-                                {code === "TWILIO" && (
+                                {TWILIO_CODES.includes(code) && (
                                     <>
                                         <div className="grid grid-cols-2 gap-4">
                                             <div className="flex flex-col gap-1.5">
@@ -376,7 +382,7 @@ export default function ClubProductProvidersPage() {
                                                 value={fields.fromNumber ?? ""}
                                                 onChange={(e) => updateField("fromNumber", e.target.value)}
                                                 required
-                                                placeholder="+15551234567"
+                                                placeholder={code === "TWILIO_WHATSAPP" ? "+14155238886 (WhatsApp sender)" : "+15551234567"}
                                                 className="input"
                                             />
                                         </div>
@@ -430,6 +436,13 @@ export default function ClubProductProvidersPage() {
                                         options={accountsForChannel("SMS")}
                                         onChange={(id) => handleAssign("SMS", id)}
                                     />
+                                    <ChannelSelector
+                                        icon={MessageCircle}
+                                        label="WhatsApp Provider"
+                                        value={assignments.WHATSAPP}
+                                        options={accountsForChannel("WHATSAPP")}
+                                        onChange={(id) => handleAssign("WHATSAPP", id)}
+                                    />
                                     {assignments.EMAIL && (
                                         <Link
                                             to={`/clubs/${clubId}/products/${selectedProductId}/test-email`}
@@ -437,6 +450,15 @@ export default function ClubProductProvidersPage() {
                                         >
                                             <Send className="w-4 h-4" />
                                             Test Send Email
+                                        </Link>
+                                    )}
+                                    {assignments.SMS && (
+                                        <Link
+                                            to={`/clubs/${clubId}/products/${selectedProductId}/test-sms`}
+                                            className="btn-primary self-start"
+                                        >
+                                            <MessageSquare className="w-4 h-4" />
+                                            Test Send SMS
                                         </Link>
                                     )}
                                 </div>
@@ -457,11 +479,11 @@ export default function ClubProductProvidersPage() {
                                             <div key={m.code} className="p-4 rounded-xl border border-gray-200">
                                                 <p className="text-sm font-semibold text-gray-800 mb-3">{m.name}</p>
                                                 <div className="flex flex-col gap-2">
-                                                    {[["EMAIL", Mail], ["SMS", MessageSquare]].map(([channel, Icon]) => (
+                                                    {MODULE_CHANNELS.map(([channel, Icon, label]) => (
                                                         <ModuleChannelSelector
                                                             key={channel}
                                                             icon={Icon}
-                                                            label={channel === "EMAIL" ? "Email" : "SMS"}
+                                                            label={label}
                                                             value={moduleAssignments[`${m.code}:${channel}`] ?? ""}
                                                             defaultName={providerAccountName(assignments[channel])}
                                                             options={accountsForChannel(channel)}
@@ -498,7 +520,7 @@ function ModuleChannelSelector({ icon: Icon, label, value, defaultName, options,
     return (
         <div className="flex flex-wrap items-center gap-3">
             <Icon className="w-4 h-4 text-gray-400" />
-            <span className="text-sm text-gray-600 w-12">{label}</span>
+            <span className="text-sm text-gray-600 w-20">{label}</span>
             <select value={value} onChange={(e) => onChange(e.target.value)} className="input flex-1 min-w-0">
                 <option value="">
                     {defaultName ? `Use product's provider (${defaultName})` : "Use product's provider (none set)"}

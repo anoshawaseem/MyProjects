@@ -149,18 +149,27 @@ public class TenantOnboardingService {
             List<ModuleTemplateSeed> seeds) {
         int[] created = { 0 };
         inSchema(schemaName, jdbcTemplate -> {
-            if (TenantSchemaLayout.detect(jdbcTemplate) != TenantSchemaLayout.CLUB_SCOPED) {
+            TenantSchemaLayout layout = TenantSchemaLayout.detect(jdbcTemplate);
+            if (!layout.supportsModules()) {
                 throw new IllegalStateException("Schema [" + schemaName + "] does not support modules");
             }
+            boolean clubColumn = layout.hasClubIdColumn();
             for (ModuleTemplateSeed seed : seeds) {
-                created[0] += jdbcTemplate.update("""
-                        INSERT INTO notification_templates (club_id, product_id, module_code, template_key, channel,
-                            name, subject, body, source_version)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                        ON CONFLICT (club_id, product_id, module_code, channel, template_key)
-                            WHERE template_key IS NOT NULL DO NOTHING
-                        """, clubId, productId, moduleCode, seed.templateKey(), seed.channel(), seed.name(),
-                        seed.subject(), seed.body(), seed.version());
+                List<Object> args = new ArrayList<>();
+                if (clubColumn) {
+                    args.add(clubId);
+                }
+                args.addAll(List.of(productId, moduleCode, seed.templateKey(), seed.channel(), seed.name()));
+                args.add(seed.subject());
+                args.add(seed.body());
+                args.add(seed.version());
+                created[0] += jdbcTemplate.update("INSERT INTO notification_templates ("
+                        + (clubColumn ? "club_id, " : "")
+                        + "product_id, module_code, template_key, channel, name, subject, body, source_version)"
+                        + " VALUES (" + (clubColumn ? "?, " : "") + "?, ?, ?, ?, ?, ?, ?, ?)"
+                        + " ON CONFLICT (" + (clubColumn ? "club_id, " : "")
+                        + "product_id, module_code, channel, template_key) WHERE template_key IS NOT NULL DO NOTHING",
+                        args.toArray());
             }
         });
         log.info("Seeded {} of {} [{}] module templates into schema [{}] for product [{}]", created[0],

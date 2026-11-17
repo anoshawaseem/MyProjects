@@ -9,6 +9,7 @@ import com.micomm.email.audit.EmailAuditLog;
 import com.micomm.email.client.TenantManagementClient;
 import com.micomm.email.client.dto.TenantDatabaseDto;
 import com.micomm.email.kafka.EmailSendMessage;
+import com.micomm.email.notification.NotificationType;
 import com.micomm.email.send.dto.EmailRecipient;
 import com.micomm.email.send.dto.SendBulkEmailRequest;
 import com.micomm.email.send.dto.SendBulkEmailResponse;
@@ -17,6 +18,7 @@ import com.micomm.email.template.EmailTemplateService;
 import com.micomm.email.template.TemplateRenderer;
 import com.micomm.email.tenant.TenantModules;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.kafka.KafkaException;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 
@@ -131,6 +133,7 @@ public class EmailSendService {
         auditLog.record(AuditEvent.of(request.clubId(), request.productId(), AuditActions.EMAIL_SEND_QUEUED,
                         "EMAIL_SEND", submission.response().requestId())
                 .with("recipientCount", submission.response().recipientCount())
+                .with("type", NotificationType.parse(request.type()).name())
                 .with("module", TenantModules.normalize(request.moduleCode()))
                 .with("templateId", request.templateId())
                 .with("templateKey", request.templateKey())
@@ -179,7 +182,8 @@ public class EmailSendService {
                     recipientVariables != null ? recipientVariables.subList(from, to) : null,
                     i,
                     chunkCount,
-                    total);
+                    total,
+                    NotificationType.parse(request.type()).name());
             requireFitsInOneMessage(chunk);
             chunks.add(chunk);
         }
@@ -194,12 +198,23 @@ public class EmailSendService {
      * QUEUED is only returned once the whole send is safely queued.
      */
     private void publish(List<EmailSendMessage> chunks) {
-        CompletableFuture<?>[] sends = chunks.stream()
-                .map(c -> kafkaTemplate.send(emailSendTopic, c.requestId() + ":" + c.chunkIndex(), c))
-                .toArray(CompletableFuture[]::new);
         UUID requestId = chunks.get(0).requestId();
+        List<CompletableFuture<?>> sends = new ArrayList<>(chunks.size());
         try {
-            CompletableFuture.allOf(sends).get(PUBLISH_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
+            for (EmailSendMessage c : chunks) {
+                sends.add(kafkaTemplate.send(emailSendTopic, c.requestId() + ":" + c.chunkIndex(), c));
+            }
+        } catch (KafkaException ex) {
+            // send() throws straight away when Kafka cannot be reached (e.g. it is not running).
+            if (sends.isEmpty()) {
+                throw new QueueUnavailableException(ex);
+            }
+            // Earlier chunks may already be on their way: same as a partly queued send.
+            throw new SendNotQueuedException(requestId, ex);
+        }
+        try {
+            CompletableFuture.allOf(sends.toArray(CompletableFuture[]::new))
+                    .get(PUBLISH_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
             throw new SendNotQueuedException(requestId, ex);
